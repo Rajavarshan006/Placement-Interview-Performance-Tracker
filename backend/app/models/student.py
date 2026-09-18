@@ -20,7 +20,7 @@ class Student(Base):
     tenth_percentage: Mapped[float] = mapped_column(Float, nullable=False)
     twelfth_percentage: Mapped[float] = mapped_column(Float, nullable=False)
     placement_marks: Mapped[float | None] = mapped_column(Float, nullable=True)
-    skills: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    skills: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     round_results: Mapped[list["RoundResult"]] = relationship(back_populates="student")

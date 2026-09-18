@@ -1,6 +1,6 @@
 """Dummy model — replace when Team A builds the real Drive entity."""
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -17,7 +17,7 @@ class Drive(Base):
     company_type: Mapped[CompanyType] = mapped_column(nullable=False)
     role_title: Mapped[str] = mapped_column(String(100), nullable=False)
     package_lpa: Mapped[float] = mapped_column(Float, nullable=False)
-    drive_date: Mapped[datetime] = mapped_column(Date, nullable=False)
+    drive_date: Mapped[date] = mapped_column(Date, nullable=False)
     required_cgpa: Mapped[float] = mapped_column(Float, nullable=False)
     required_tenth: Mapped[float] = mapped_column(Float, nullable=False)
     required_twelfth: Mapped[float] = mapped_column(Float, nullable=False)
