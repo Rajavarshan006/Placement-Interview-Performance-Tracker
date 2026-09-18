@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
+import app.models  # noqa: F401 — registers all models with Base
 
 
 @asynccontextmanager
