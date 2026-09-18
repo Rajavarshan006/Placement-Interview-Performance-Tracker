@@ -177,3 +177,35 @@ def test_list_interventions(mock_groq_cls, client, db):
     resp = client.get("/api/intervention/")
     assert resp.status_code == 200
     assert len(resp.json()) >= 1
+
+
+@patch("app.services.groq_agent.Groq")
+def test_update_action_status(mock_groq_cls, client, db):
+    import json
+    mock_client = mock_groq_cls.return_value
+    mock_response = type("R", (), {
+        "choices": [type("C", (), {
+            "message": type("M", (), {"content": json.dumps(MOCK_GROQ_RESPONSE)})()
+        })()]
+    })()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    student, coord = _seed_test_data(db)
+    create_resp = client.post(
+        f"/api/intervention/{student.student_id}",
+        json={"student_id": student.student_id, "coordinator_id": coord.coordinator_id},
+    )
+    data = create_resp.json()
+    intv_id = data["intervention_id"]
+    action_id = data["actions"][0]["action_id"]
+
+    resp = client.patch(
+        f"/api/intervention/{intv_id}/actions/{action_id}",
+        json={"is_completed": True, "notes": "Completed all exercises"},
+    )
+    assert resp.status_code == 200
+    updated_data = resp.json()
+    updated_action = [a for a in updated_data["actions"] if a["action_id"] == action_id][0]
+    assert updated_action["is_completed"] is True
+    assert updated_action["completed_at"] is not None
+    assert updated_action["notes"] == "Completed all exercises"
