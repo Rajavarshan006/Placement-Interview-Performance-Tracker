@@ -23,6 +23,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.routers.intervention import router as intervention_router
+
+app.include_router(intervention_router)
+
 
 @app.get("/health")
 def health():
