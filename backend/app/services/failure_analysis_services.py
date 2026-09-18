@@ -5,12 +5,7 @@ from typing import Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from pydantic import BaseModel
 
-app = FastAPI(
-    title="Placement Failure Pattern Analysis API",
-    version="1.0.0",
-    description="Coordinator, mentor, and student views of interview failure patterns.",
-)
-
+app = FastAPI()
 
 # ---------------------------------------------------------------------------
 # Mock data. In the real project these will be database tables.
