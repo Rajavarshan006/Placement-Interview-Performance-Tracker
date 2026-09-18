@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.enums import InterventionStatus
+
 
 class InterventionCreate(BaseModel):
     student_id: str
@@ -45,7 +47,7 @@ class InterventionOut(BaseModel):
 
 
 class InterventionStatusUpdate(BaseModel):
-    status: str
+    status: InterventionStatus
     mentor_id: str | None = None
 
 

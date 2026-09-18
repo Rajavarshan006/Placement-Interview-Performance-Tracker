@@ -30,7 +30,12 @@ def create_intervention(student_id: str, body: InterventionCreate, db: Session =
     if not coordinator:
         raise HTTPException(status_code=404, detail="Coordinator not found")
 
-    result = generate_intervention(db, student_id, body.coordinator_id)
+    try:
+        result = generate_intervention(db, student_id, body.coordinator_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
     intervention = Intervention(
         student_id=student_id,
@@ -118,9 +123,9 @@ def update_intervention_status(
     intervention.status = body.status
     intervention.updated_at = datetime.utcnow()
 
-    if body.status == InterventionStatus.APPROVED.value:
+    if body.status == InterventionStatus.APPROVED:
         intervention.approved_at = datetime.utcnow()
-    if body.status == InterventionStatus.COMPLETED.value:
+    if body.status == InterventionStatus.COMPLETED:
         intervention.completed_at = datetime.utcnow()
     if body.mentor_id:
         intervention.mentor_id = body.mentor_id

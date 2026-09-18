@@ -101,16 +101,22 @@ def generate_intervention(db: Session, student_id: str, coordinator_id: str) -> 
 
     prompt = build_prompt(patterns)
 
-    client = Groq(api_key=settings.groq_api_key)
-    response = client.chat.completions.create(
-        model=settings.groq_model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=2000,
-    )
+    try:
+        client = Groq(api_key=settings.groq_api_key)
+        response = client.chat.completions.create(
+            model=settings.groq_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=2000,
+        )
+    except Exception as e:
+        raise RuntimeError(f"Groq API call failed: {e}") from e
 
     raw_content = response.choices[0].message.content
-    parsed = parse_groq_response(raw_content)
+    try:
+        parsed = parse_groq_response(raw_content)
+    except (json.JSONDecodeError, KeyError) as e:
+        raise RuntimeError(f"Failed to parse Groq response: {e}") from e
     priority = compute_priority(patterns)
 
     bottleneck = patterns.get("biggest_bottleneck", "Unknown")
