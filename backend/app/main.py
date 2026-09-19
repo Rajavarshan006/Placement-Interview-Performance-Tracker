@@ -24,8 +24,10 @@ app.add_middleware(
 )
 
 from app.routers.intervention import router as intervention_router
+from app.routers.failure_analysis import router as failure_analysis_router
 
 app.include_router(intervention_router)
+app.include_router(failure_analysis_router)
 
 
 @app.get("/health")
