@@ -125,3 +125,5 @@ export const simulateActivation = async (studentId: string): Promise<AccessOpera
 export const resetMockData = () => {
   studentsState = JSON.parse(JSON.stringify(mockPlacedStudents));
 };
+
+export const getMockState = () => studentsState;

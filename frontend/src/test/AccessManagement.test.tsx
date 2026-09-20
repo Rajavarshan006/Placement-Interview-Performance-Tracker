@@ -1,293 +1,869 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { AccessManagement } from '../pages/AccessManagement';
-import * as coordinatorService from '../services/coordinatorService';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { StudentAccessDirectory } from '../pages/StudentAccessDirectory';
+import { StudentAccessDetail } from '../pages/StudentAccessDetail';
+import { resetMockData } from '../services/coordinatorService';
 
-// Mock the coordinator service
-vi.mock('../services/coordinatorService');
+// Helper to render with router
+const renderWithRouter = (initialRoute = '/coordinator/access') => {
+  return render(
+    <MemoryRouter initialEntries={[initialRoute]}>
+      <Routes>
+        <Route path="/coordinator/access" element={<StudentAccessDirectory />} />
+        <Route path="/coordinator/access/:studentId" element={<StudentAccessDetail />} />
+      </Routes>
+    </MemoryRouter>
+  );
+};
 
-describe('AccessManagement', () => {
-  const mockStudents = [
-    {
-      studentId: '1',
-      name: 'Sneha Gupta',
-      registerNumber: '2021CS108',
-      department: 'CSE',
-      email: 'sneha@college.edu',
-      cgpa: 9.0,
-      placedCompany: 'Zoho',
-      rolePlaced: 'Member Technical Staff',
-      packageLpa: 8.0,
-      accessStatus: 'ACTIVE' as const,
-    },
-    {
-      studentId: '2',
-      name: 'Priya Nair',
-      registerNumber: '2021CS106',
-      department: 'CSE',
-      email: 'priyan@college.edu',
-      cgpa: 8.1,
-      placedCompany: 'Infosys',
-      rolePlaced: 'Systems Engineer',
-      packageLpa: 5.0,
-      accessStatus: 'NO_ACCESS' as const,
-    },
-  ];
-
+describe('Coordinator Access Management - Lifecycle Implementation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Setup default mock implementation
-    vi.mocked(coordinatorService.getPlacedStudents).mockResolvedValue(
-      mockStudents
-    );
+    // Reset mock data to ensure test isolation
+    resetMockData();
   });
 
-  it('renders the access management page', async () => {
-    render(<AccessManagement />);
+  // =================================================================
+  // DIRECTORY TESTS
+  // =================================================================
 
-    expect(
-      screen.getByText('Coordinator Access Management')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Manage access permissions for placed students')
-    ).toBeInTheDocument();
-  });
+  describe('Student Access Directory', () => {
+    it('renders the directory page with correct title', async () => {
+      renderWithRouter();
 
-  it('displays placed students after loading', async () => {
-    render(<AccessManagement />);
+      expect(screen.getByText('Coordinator Access Management')).toBeInTheDocument();
+      expect(screen.getByText('Manage student access to the placement portal')).toBeInTheDocument();
+    });
 
-    // Wait for loading to complete
-    await waitFor(() => {
-      expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+    it('displays students after loading', async () => {
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+        expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+        expect(screen.getByText('Rajesh Kumar')).toBeInTheDocument();
+      });
+    });
+
+    it('searches students by name', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByPlaceholderText(/search by name/i);
+      await user.type(searchInput, 'Sneha');
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+        expect(screen.queryByText('Priya Nair')).not.toBeInTheDocument();
+      });
+    });
+
+    it('searches students by register number', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByPlaceholderText(/search by name/i);
+      await user.clear(searchInput);
+      await user.type(searchInput, '2021CS106');
+
+      await waitFor(() => {
+        expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+        expect(screen.queryByText('Sneha Gupta')).not.toBeInTheDocument();
+      });
+    });
+
+    it('searches students by email', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Rajesh Kumar')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByPlaceholderText(/search by name/i);
+      await user.clear(searchInput);
+      await user.type(searchInput, 'rajesh@college.edu');
+
+      await waitFor(() => {
+        expect(screen.getByText('Rajesh Kumar')).toBeInTheDocument();
+        expect(screen.queryByText('Priya Nair')).not.toBeInTheDocument();
+      });
+    });
+
+    it('filters students by department', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const departmentSelect = screen.getByLabelText(/department/i);
+      await user.selectOptions(departmentSelect, 'IT');
+
+      await waitFor(() => {
+        expect(screen.getByText('Rajesh Kumar')).toBeInTheDocument();
+        expect(screen.queryByText('Sneha Gupta')).not.toBeInTheDocument();
+      });
+    });
+
+    it('filters students by access status - No Access', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const statusSelect = screen.getByLabelText(/access status/i);
+      await user.selectOptions(statusSelect, 'NO_ACCESS');
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+        expect(screen.getByText('Vikram Singh')).toBeInTheDocument();
+        expect(screen.queryByText('Priya Nair')).not.toBeInTheDocument();
+      });
+    });
+
+    it('filters students by access status - Invited', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Rajesh Kumar')).toBeInTheDocument();
+      });
+
+      const statusSelect = screen.getByLabelText(/access status/i);
+      await user.selectOptions(statusSelect, 'INVITED');
+
+      await waitFor(() => {
+        expect(screen.getByText('Rajesh Kumar')).toBeInTheDocument();
+        expect(screen.queryByText('Sneha Gupta')).not.toBeInTheDocument();
+      });
+    });
+
+    it('filters students by access status - Active', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+      });
+
+      const statusSelect = screen.getByLabelText(/access status/i);
+      await user.selectOptions(statusSelect, 'ACTIVE');
+
+      await waitFor(() => {
+        expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+        expect(screen.queryByText('Sneha Gupta')).not.toBeInTheDocument();
+      });
+    });
+
+    it('filters students by access status - Revoked', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Anitha Reddy')).toBeInTheDocument();
+      });
+
+      const statusSelect = screen.getByLabelText(/access status/i);
+      await user.selectOptions(statusSelect, 'REVOKED');
+
+      await waitFor(() => {
+        expect(screen.getByText('Anitha Reddy')).toBeInTheDocument();
+        expect(screen.queryByText('Sneha Gupta')).not.toBeInTheDocument();
+      });
+    });
+
+    it('sorts students by name A-Z', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByLabelText(/sort by/i);
+      await user.selectOptions(sortSelect, 'name-asc');
+
+      await waitFor(() => {
+        const rows = screen.getAllByRole('row');
+        const firstDataRow = rows[1];
+        expect(within(firstDataRow).getByText('Anitha Reddy')).toBeInTheDocument();
+      });
+    });
+
+    it('sorts students by name Z-A', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByLabelText(/sort by/i);
+      await user.selectOptions(sortSelect, 'name-desc');
+
+      await waitFor(() => {
+        const rows = screen.getAllByRole('row');
+        const firstDataRow = rows[1];
+        expect(within(firstDataRow).getByText('Vikram Singh')).toBeInTheDocument();
+      });
+    });
+
+    it('sorts students by register number ascending', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByLabelText(/sort by/i);
+      await user.selectOptions(sortSelect, 'regno-asc');
+
+      await waitFor(() => {
+        const rows = screen.getAllByRole('row');
+        const firstDataRow = rows[1];
+        expect(within(firstDataRow).getByText('2021CS106')).toBeInTheDocument();
+      });
+    });
+
+    it('sorts students by register number descending', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByLabelText(/sort by/i);
+      await user.selectOptions(sortSelect, 'regno-desc');
+
+      await waitFor(() => {
+        const rows = screen.getAllByRole('row');
+        const firstDataRow = rows[1];
+        expect(within(firstDataRow).getByText('2021IT023')).toBeInTheDocument();
+      });
+    });
+
+    it('combines search, department, and status filters correctly', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const departmentSelect = screen.getByLabelText(/department/i);
+      await user.selectOptions(departmentSelect, 'CSE');
+
+      const statusSelect = screen.getByLabelText(/access status/i);
+      await user.selectOptions(statusSelect, 'NO_ACCESS');
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+        expect(screen.queryByText('Priya Nair')).not.toBeInTheDocument();
+      });
+    });
+
+    it('updates result count correctly', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText(/showing 5 of 5 students/i)).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByPlaceholderText(/search by name/i);
+      await user.type(searchInput, 'Sneha');
+
+      await waitFor(() => {
+        expect(screen.getByText(/showing 1 of 5 students/i)).toBeInTheDocument();
+      });
+    });
+
+    it('shows empty state when no students match criteria', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByPlaceholderText(/search by name/i);
+      await user.type(searchInput, 'NonExistentStudent');
+
+      await waitFor(() => {
+        expect(screen.getByText(/no students found matching your criteria/i)).toBeInTheDocument();
+      });
+    });
+
+    it('displays Manage button for each student', async () => {
+      renderWithRouter();
+
+      await waitFor(() => {
+        const manageButtons = screen.getAllByText('Manage');
+        expect(manageButtons.length).toBe(5);
+      });
+    });
+
+    it('navigates to student detail page with correct ID when Manage is clicked', async () => {
+      const user = userEvent.setup();
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      });
+
+      const rows = screen.getAllByRole('row');
+      const firstDataRow = rows[1];
+      const manageButton = within(firstDataRow).getByText('Manage');
+      await user.click(manageButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Student Information')).toBeInTheDocument();
+        expect(screen.getByText('Placement Information')).toBeInTheDocument();
+      });
     });
   });
 
-  it('shows "Give Access" button for students without access', async () => {
-    render(<AccessManagement />);
+  // =================================================================
+  // STUDENT DETAIL TESTS
+  // =================================================================
 
-    await waitFor(() => {
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+  describe('Student Detail Page', () => {
+    it('renders student details correctly', async () => {
+      renderWithRouter('/coordinator/access/1');
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Sneha Gupta').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('2021CS108').length).toBeGreaterThan(0);
+        expect(screen.getByText('Student Information')).toBeInTheDocument();
+      });
     });
 
-    // Priya has NO_ACCESS, should show Give Access button
-    const giveAccessButtons = screen.getAllByText('Give Access');
-    expect(giveAccessButtons.length).toBeGreaterThan(0);
-  });
+    it('renders Student Information section correctly', async () => {
+      renderWithRouter('/coordinator/access/1');
 
-  it('shows "Remove Access" button for students with active access', async () => {
-    render(<AccessManagement />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Student Information')).toBeInTheDocument();
+        expect(screen.getByText('sneha@college.edu')).toBeInTheDocument();
+        expect(screen.getByText('CSE')).toBeInTheDocument();
+      });
     });
 
-    // Sneha has ACTIVE access, should show Remove Access button
-    const removeAccessButtons = screen.getAllByText('Remove Access');
-    expect(removeAccessButtons.length).toBeGreaterThan(0);
-  });
+    it('renders Placement Information section separately', async () => {
+      renderWithRouter('/coordinator/access/1');
 
-  it('opens confirmation dialog when Give Access is clicked', async () => {
-    const user = userEvent.setup();
-    render(<AccessManagement />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Placement Information')).toBeInTheDocument();
+        expect(screen.getByText('Zoho')).toBeInTheDocument();
+        expect(screen.getByText('Member Technical Staff')).toBeInTheDocument();
+      });
     });
 
-    // Click Give Access button for Priya
-    const giveAccessButton = screen.getAllByText('Give Access')[0];
-    await user.click(giveAccessButton);
+    it('renders Portal Access Status section correctly', async () => {
+      renderWithRouter('/coordinator/access/1');
 
-    // Check confirmation dialog appears
-    await waitFor(() => {
-      expect(screen.getByText('Give Access Confirmation')).toBeInTheDocument();
-    });
-  });
-
-  it('closes dialog when Cancel is clicked', async () => {
-    const user = userEvent.setup();
-    render(<AccessManagement />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Portal Access Status')).toBeInTheDocument();
+        expect(screen.getByText('Current Status')).toBeInTheDocument();
+      });
     });
 
-    // Click Give Access
-    const giveAccessButton = screen.getAllByText('Give Access')[0];
-    await user.click(giveAccessButton);
+    it('shows Student Not Found for invalid student ID', async () => {
+      renderWithRouter('/coordinator/access/999');
 
-    // Wait for dialog
-    await waitFor(() => {
-      expect(screen.getByText('Give Access Confirmation')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Student Not Found')).toBeInTheDocument();
+      });
     });
 
-    // Click Cancel
-    const cancelButton = screen.getByText('Cancel');
-    await user.click(cancelButton);
+    it('Back to Student Access button navigates correctly', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/999');
 
-    // Dialog should close
-    await waitFor(() => {
-      expect(
-        screen.queryByText('Give Access Confirmation')
-      ).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Student Not Found')).toBeInTheDocument();
+      });
+
+      const backButton = screen.getByText(/back to student access/i);
+      await user.click(backButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Coordinator Access Management')).toBeInTheDocument();
+      });
     });
   });
 
-  it('calls giveAccess service when confirmed', async () => {
-    const user = userEvent.setup();
-    vi.mocked(coordinatorService.giveAccess).mockResolvedValue({
-      success: true,
-      message: 'Access granted successfully',
-      studentId: '2',
+  // =================================================================
+  // NO_ACCESS STATE TESTS
+  // =================================================================
+
+  describe('NO_ACCESS State', () => {
+    it('NO_ACCESS student shows Give Access button', async () => {
+      renderWithRouter('/coordinator/access/1');
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /give access/i })).toBeInTheDocument();
+      });
     });
 
-    render(<AccessManagement />);
+    it('clicking Give Access opens Grant Portal Access confirmation', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/1');
 
-    await waitFor(() => {
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /give access/i })).toBeInTheDocument();
+      });
+
+      const giveAccessButton = screen.getByRole('button', { name: /give access/i });
+      await user.click(giveAccessButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Grant Portal Access')).toBeInTheDocument();
+      });
     });
 
-    // Click Give Access
-    const giveAccessButton = screen.getAllByText('Give Access')[0];
-    await user.click(giveAccessButton);
+    it('Grant Portal Access confirmation displays student details', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/1');
 
-    // Wait for dialog and click confirm
-    await waitFor(() => {
-      expect(screen.getByText('Give Access Confirmation')).toBeInTheDocument();
+      const giveAccessButton = await screen.findByRole('button', { name: /give access/i });
+      await user.click(giveAccessButton);
+
+      await waitFor(() => {
+        expect(screen.getAllByText(/sneha gupta/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/2021CS108/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/sneha@college.edu/i).length).toBeGreaterThan(0);
+      });
     });
 
-    const confirmButton = screen.getAllByText('Give Access')[1]; // Second one is in dialog
-    await user.click(confirmButton);
+    it('Cancel closes dialog and keeps NO_ACCESS status', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/1');
 
-    // Verify service was called
-    await waitFor(() => {
-      expect(coordinatorService.giveAccess).toHaveBeenCalledWith(
-        'mock-coordinator-1',
-        '2'
-      );
-    });
-  });
+      const giveAccessButton = await screen.findByRole('button', { name: /give access/i });
+      await user.click(giveAccessButton);
 
-  it('opens confirmation dialog when Remove Access is clicked', async () => {
-    const user = userEvent.setup();
-    render(<AccessManagement />);
+      await waitFor(() => {
+        expect(screen.getByText('Grant Portal Access')).toBeInTheDocument();
+      });
 
-    await waitFor(() => {
-      expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
-    });
+      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      await user.click(cancelButton);
 
-    // Click Remove Access button for Sneha
-    const removeAccessButton = screen.getAllByText('Remove Access')[0];
-    await user.click(removeAccessButton);
-
-    // Check confirmation dialog appears
-    await waitFor(() => {
-      expect(
-        screen.getByText('Remove Access Confirmation')
-      ).toBeInTheDocument();
-    });
-  });
-
-  it('calls removeAccess service when confirmed', async () => {
-    const user = userEvent.setup();
-    vi.mocked(coordinatorService.removeAccess).mockResolvedValue({
-      success: true,
-      message: 'Access removed successfully',
-      studentId: '1',
+      await waitFor(() => {
+        expect(screen.queryByText('Grant Portal Access')).not.toBeInTheDocument();
+      });
     });
 
-    render(<AccessManagement />);
+    it('Send Invitation transitions NO_ACCESS to INVITED', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/1');
 
-    await waitFor(() => {
-      expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
+      const giveAccessButton = await screen.findByRole('button', { name: /give access/i });
+      await user.click(giveAccessButton);
+
+      const sendButton = await screen.findByRole('button', { name: /send invitation/i });
+      await user.click(sendButton);
+
+      // Wait for success toast and state change
+      await waitFor(() => {
+        expect(screen.getByText(/invitation sent successfully/i)).toBeInTheDocument();
+      });
+
+      // After reload, should show INVITED state buttons
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /resend invitation/i })).toBeInTheDocument();
+      }, { timeout: 3000 });
     });
 
-    // Click Remove Access
-    const removeAccessButton = screen.getAllByText('Remove Access')[0];
-    await user.click(removeAccessButton);
+    it('Access History shows Invitation sent entry', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/1');
 
-    // Wait for dialog and click confirm
-    await waitFor(() => {
-      expect(
-        screen.getByText('Remove Access Confirmation')
-      ).toBeInTheDocument();
-    });
+      const giveAccessButton = await screen.findByRole('button', { name: /give access/i });
+      await user.click(giveAccessButton);
 
-    const confirmButton = screen.getAllByText('Remove Access')[1];
-    await user.click(confirmButton);
+      const sendButton = await screen.findByRole('button', { name: /send invitation/i });
+      await user.click(sendButton);
 
-    // Verify service was called
-    await waitFor(() => {
-      expect(coordinatorService.removeAccess).toHaveBeenCalledWith(
-        'mock-coordinator-1',
-        '1'
-      );
-    });
-  });
-
-  it('filters students by search query', async () => {
-    const user = userEvent.setup();
-    render(<AccessManagement />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
-    });
-
-    // Search for Sneha
-    const searchInput = screen.getByPlaceholderText(
-      'Search by name or register number...'
-    );
-    await user.type(searchInput, 'Sneha');
-
-    // Only Sneha should be visible
-    await waitFor(() => {
-      expect(screen.getByText('Sneha Gupta')).toBeInTheDocument();
-      expect(screen.queryByText('Priya Nair')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/invitation sent/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
     });
   });
 
-  it('shows empty state when no students', async () => {
-    vi.mocked(coordinatorService.getPlacedStudents).mockResolvedValue([]);
+  // =================================================================
+  // INVITED STATE TESTS
+  // =================================================================
 
-    render(<AccessManagement />);
+  describe('INVITED State', () => {
+    it('INVITED student shows correct action buttons', async () => {
+      renderWithRouter('/coordinator/access/3');
 
-    await waitFor(() => {
-      expect(screen.getByText('No Placed Students')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /resend invitation/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /revoke invitation/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /simulate student activation/i })).toBeInTheDocument();
+      });
+    });
+
+    it('Resend Invitation keeps status as INVITED', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/3');
+
+      const resendButtons = await screen.findAllByRole('button', { name: /resend invitation/i });
+      await user.click(resendButtons[0]);
+
+      // Wait for dialog to open
+      const dialog = await screen.findByRole('dialog');
+
+      // Find and click the confirm button within the dialog
+      const confirmButton = within(dialog).getByRole('button', { name: /resend invitation/i });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/invitation resent successfully/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+    });
+
+    it('Revoke confirmation can be cancelled without state change', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/3');
+
+      const revokeButtons = await screen.findAllByRole('button', { name: /revoke invitation/i });
+      await user.click(revokeButtons[0]);
+
+      // Wait for dialog to open
+      const dialog = await screen.findByRole('dialog');
+
+      // Find and click cancel button within dialog
+      const cancelButton = within(dialog).getByRole('button', { name: /cancel/i });
+      await user.click(cancelButton);
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+    });
+
+    it('confirming revoke changes INVITED to REVOKED', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/3');
+
+      const revokeButtons = await screen.findAllByRole('button', { name: /revoke invitation/i });
+      await user.click(revokeButtons[0]);
+
+      // Wait for dialog to open
+      const dialog = await screen.findByRole('dialog');
+
+      // Find and click confirm button within dialog
+      const confirmButton = within(dialog).getByRole('button', { name: /revoke invitation/i });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /give access again/i })).toBeInTheDocument();
+      }, { timeout: 3000 });
+    });
+
+    it('Access History receives Invitation revoked entry', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/3');
+
+      const revokeButtons = await screen.findAllByRole('button', { name: /revoke invitation/i });
+      await user.click(revokeButtons[0]);
+
+      // Wait for dialog to open
+      const dialog = await screen.findByRole('dialog');
+
+      // Find and click confirm button within dialog
+      const confirmButton = within(dialog).getByRole('button', { name: /revoke invitation/i });
+      await user.click(confirmButton);
+
+      // Wait for the success toast to appear
+      await waitFor(() => {
+        expect(screen.getByText(/invitation revoked successfully/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      // Check that the history entry exists (will appear alongside the toast)
+      await waitFor(() => {
+        const historyEntries = screen.getAllByText(/invitation revoked/i);
+        expect(historyEntries.length).toBeGreaterThan(0);
+      }, { timeout: 1000 });
+    });
+
+    it('Simulate Student Activation is clearly marked as demo', async () => {
+      renderWithRouter('/coordinator/access/3');
+
+      await waitFor(() => {
+        expect(screen.getByText(/demo \/ mock only/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /simulate student activation/i })).toBeInTheDocument();
+      });
+    });
+
+    it('activation changes INVITED to ACTIVE', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/3');
+
+      const activateButton = await screen.findByRole('button', { name: /simulate student activation/i });
+      await user.click(activateButton);
+
+      // Wait for dialog to open
+      const dialog = await screen.findByRole('dialog');
+
+      // Find and click confirm button within dialog
+      const confirmButton = within(dialog).getByRole('button', { name: /activate account/i });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /remove access/i })).toBeInTheDocument();
+      }, { timeout: 3000 });
+    });
+
+    it('Activated On and Last Login are populated after activation', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/3');
+
+      const activateButton = await screen.findByRole('button', { name: /simulate student activation/i });
+      await user.click(activateButton);
+
+      const confirmButton = await screen.findByRole('button', { name: /activate account/i });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        // Should no longer show "—" for these fields
+        const portalSection = screen.getByText('Portal Access Status').closest('div');
+        expect(portalSection).not.toHaveTextContent('Activated On—');
+      }, { timeout: 3000 });
+    });
+
+    it('Access History receives Account activated entry', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/3');
+
+      const activateButton = await screen.findByRole('button', { name: /simulate student activation/i });
+      await user.click(activateButton);
+
+      // Wait for dialog to open
+      const dialog = await screen.findByRole('dialog');
+
+      // Find and click confirm button within dialog
+      const confirmButton = within(dialog).getByRole('button', { name: /activate account/i });
+      await user.click(confirmButton);
+
+      // Wait for success toast
+      await waitFor(() => {
+        expect(screen.getByText(/account activated \(demo\)/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      // Check history entry
+      await waitFor(() => {
+        const historyEntries = screen.getAllByText(/account activated/i);
+        expect(historyEntries.length).toBeGreaterThan(0);
+      }, { timeout: 1000 });
     });
   });
 
-  it('displays error toast on service failure', async () => {
-    const user = userEvent.setup();
-    vi.mocked(coordinatorService.giveAccess).mockResolvedValue({
-      success: false,
-      message: 'Student already has access',
+  // =================================================================
+  // ACTIVE STATE TESTS
+  // =================================================================
+
+  describe('ACTIVE State', () => {
+    it('ACTIVE student shows Remove Access button', async () => {
+      renderWithRouter('/coordinator/access/2');
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /remove access/i })).toBeInTheDocument();
+      });
     });
 
-    render(<AccessManagement />);
+    it('clicking Remove Access opens confirmation', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/2');
 
-    await waitFor(() => {
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+      const removeButton = await screen.findByRole('button', { name: /remove access/i });
+      await user.click(removeButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Remove Portal Access')).toBeInTheDocument();
+      });
     });
 
-    // Click Give Access
-    const giveAccessButton = screen.getAllByText('Give Access')[0];
-    await user.click(giveAccessButton);
+    it('confirmation explains that placement history is NOT deleted', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/2');
 
-    // Confirm
-    await waitFor(() => {
-      expect(screen.getByText('Give Access Confirmation')).toBeInTheDocument();
+      const removeButton = await screen.findByRole('button', { name: /remove access/i });
+      await user.click(removeButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/placement records and recruitment history will NOT be deleted/i)).toBeInTheDocument();
+      });
     });
-    const confirmButton = screen.getAllByText('Give Access')[1];
-    await user.click(confirmButton);
 
-    // Error toast should appear
-    await waitFor(() => {
-      expect(
-        screen.getByText('Student already has access')
-      ).toBeInTheDocument();
+    it('Cancel keeps status as ACTIVE', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/2');
+
+      const removeButton = await screen.findByRole('button', { name: /remove access/i });
+      await user.click(removeButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Remove Portal Access')).toBeInTheDocument();
+      });
+
+      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      await user.click(cancelButton);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Remove Portal Access')).not.toBeInTheDocument();
+      });
+    });
+
+    it('Confirm changes ACTIVE to REVOKED', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/2');
+
+      const removeButton = await screen.findByRole('button', { name: /remove access/i });
+      await user.click(removeButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Remove Portal Access')).toBeInTheDocument();
+      });
+
+      const confirmButton = screen.getAllByRole('button', { name: /remove access/i })[1];
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /give access again/i })).toBeInTheDocument();
+      }, { timeout: 3000 });
+    });
+
+    it('Access History receives Access removed entry', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/2');
+
+      const removeButtons = await screen.findAllByRole('button', { name: /remove access/i });
+      await user.click(removeButtons[0]);
+
+      // Wait for dialog to open
+      const dialog = await screen.findByRole('dialog');
+
+      // Find and click confirm button within dialog
+      const confirmButton = within(dialog).getByRole('button', { name: /remove access/i });
+      await user.click(confirmButton);
+
+      // Wait for success toast
+      await waitFor(() => {
+        expect(screen.getByText(/access removed successfully/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      // Check history entry
+      await waitFor(() => {
+        const historyEntries = screen.getAllByText(/access removed/i);
+        expect(historyEntries.length).toBeGreaterThan(0);
+      }, { timeout: 1000 });
+    });
+  });
+
+  // =================================================================
+  // REVOKED STATE TESTS
+  // =================================================================
+
+  describe('REVOKED State', () => {
+    it('REVOKED student shows Give Access Again button', async () => {
+      renderWithRouter('/coordinator/access/4');
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /give access again/i })).toBeInTheDocument();
+      });
+    });
+
+    it('Give Access Again uses invitation workflow', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/4');
+
+      const giveAccessButton = await screen.findByRole('button', { name: /give access again/i });
+      await user.click(giveAccessButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Grant Portal Access')).toBeInTheDocument();
+        expect(screen.getByText(/an invitation will be sent/i)).toBeInTheDocument();
+      });
+    });
+
+    it('Confirm changes REVOKED to INVITED (not ACTIVE)', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/4');
+
+      const giveAccessButton = await screen.findByRole('button', { name: /give access again/i });
+      await user.click(giveAccessButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Grant Portal Access')).toBeInTheDocument();
+      });
+
+      const sendButton = screen.getByRole('button', { name: /send invitation/i });
+      await user.click(sendButton);
+
+      // Should transition to INVITED, not ACTIVE
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /resend invitation/i })).toBeInTheDocument();
+      }, { timeout: 3000 });
+    });
+
+    it('Access History receives New invitation sent entry', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/4');
+
+      const giveAccessButton = await screen.findByRole('button', { name: /give access again/i });
+      await user.click(giveAccessButton);
+
+      const sendButton = await screen.findByRole('button', { name: /send invitation/i });
+      await user.click(sendButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/new invitation sent/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+    });
+
+    it('Previous history remains preserved after re-invitation', async () => {
+      const user = userEvent.setup();
+      renderWithRouter('/coordinator/access/4');
+
+      // Check that old history is still there
+      await waitFor(() => {
+        const historyItems = screen.getAllByText(/invitation sent|account activated|access removed/i);
+        expect(historyItems.length).toBeGreaterThan(0);
+      });
+
+      const giveAccessButton = await screen.findByRole('button', { name: /give access again/i });
+      await user.click(giveAccessButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Grant Portal Access')).toBeInTheDocument();
+      });
+
+      const sendButton = await screen.findByRole('button', { name: /send invitation/i });
+      await user.click(sendButton);
+
+      // New entry should be added, old entries should remain
+      await waitFor(() => {
+        const newEntry = screen.getByText(/new invitation sent/i);
+        expect(newEntry).toBeInTheDocument();
+      }, { timeout: 3000 });
     });
   });
 });
