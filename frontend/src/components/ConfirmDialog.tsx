@@ -51,7 +51,7 @@ export const ConfirmDialog = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity"
       onClick={onCancel}
       role="dialog"
       aria-modal="true"
@@ -59,27 +59,27 @@ export const ConfirmDialog = ({
     >
       <div
         ref={dialogRef}
-        className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+        className="bg-white rounded-xl shadow-xl border border-slate-100 p-6 max-w-md w-full mx-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="dialog-title" className="text-xl font-semibold text-gray-900 mb-4">
+        <h2 id="dialog-title" className="text-xl font-semibold text-slate-900 mb-2">
           {title}
         </h2>
-        <div className="text-gray-600 mb-6">{message}</div>
+        <div className="text-slate-600 text-sm mb-6">{message}</div>
         <div className="flex gap-3 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm transition-colors"
           >
             {cancelLabel}
           </button>
           <button
             ref={confirmButtonRef}
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+            className={`px-4 py-2 rounded-lg text-white font-medium text-sm transition-colors ${
               isDestructive
-                ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
             {confirmLabel}

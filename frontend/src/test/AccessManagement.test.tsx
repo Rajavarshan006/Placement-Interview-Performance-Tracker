@@ -597,7 +597,7 @@ describe('Coordinator Access Management - Lifecycle Implementation', () => {
         expect(screen.getByText(/invitation revoked successfully/i)).toBeInTheDocument();
       }, { timeout: 3000 });
 
-      // Check that the history entry exists (will appear alongside the toast)
+      // Check that the history entry exists
       await waitFor(() => {
         const historyEntries = screen.getAllByText(/invitation revoked/i);
         expect(historyEntries.length).toBeGreaterThan(0);
@@ -653,26 +653,33 @@ describe('Coordinator Access Management - Lifecycle Implementation', () => {
       const user = userEvent.setup();
       renderWithRouter('/coordinator/access/3');
 
-      const activateButton = await screen.findByRole('button', { name: /simulate student activation/i });
+      const activateButton = await screen.findByRole('button', {
+        name: /simulate student activation/i
+      });
       await user.click(activateButton);
 
       // Wait for dialog to open
       const dialog = await screen.findByRole('dialog');
 
-      // Find and click confirm button within dialog
-      const confirmButton = within(dialog).getByRole('button', { name: /activate account/i });
+      // Confirm the simulated activation
+      const confirmButton = within(dialog).getByRole('button', {
+        name: /activate account/i
+      });
       await user.click(confirmButton);
 
-      // Wait for success toast
+      // Verify the student transitioned to ACTIVE
       await waitFor(() => {
-        expect(screen.getByText(/account activated \(demo\)/i)).toBeInTheDocument();
+        expect(
+          screen.getByRole('button', { name: /remove access/i })
+        ).toBeInTheDocument();
       }, { timeout: 3000 });
 
-      // Check history entry
+      // Verify the Access History entry
       await waitFor(() => {
-        const historyEntries = screen.getAllByText(/account activated/i);
-        expect(historyEntries.length).toBeGreaterThan(0);
-      }, { timeout: 1000 });
+        expect(
+          screen.getByText(/^account activated$/i)
+        ).toBeInTheDocument();
+      });
     });
   });
 
@@ -856,7 +863,7 @@ describe('Coordinator Access Management - Lifecycle Implementation', () => {
         expect(screen.getByText('Grant Portal Access')).toBeInTheDocument();
       });
 
-      const sendButton = await screen.findByRole('button', { name: /send invitation/i });
+      const sendButton = screen.getByRole('button', { name: /send invitation/i });
       await user.click(sendButton);
 
       // New entry should be added, old entries should remain
