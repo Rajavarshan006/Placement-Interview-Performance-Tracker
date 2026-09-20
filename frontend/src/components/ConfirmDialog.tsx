@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
@@ -65,7 +65,7 @@ export const ConfirmDialog = ({
         <h2 id="dialog-title" className="text-xl font-semibold text-gray-900 mb-4">
           {title}
         </h2>
-        <p className="text-gray-600 mb-6">{message}</p>
+        <div className="text-gray-600 mb-6">{message}</div>
         <div className="flex gap-3 justify-end">
           <button
             onClick={onCancel}

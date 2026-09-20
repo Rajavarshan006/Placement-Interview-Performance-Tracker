@@ -5,7 +5,23 @@
  * "Placed students" are students with final_status === "SELECTED" in their registrations.
  */
 
-export type AccessStatus = 'ACTIVE' | 'NO_ACCESS';
+export type AccessStatus = 'NO_ACCESS' | 'INVITED' | 'ACTIVE' | 'REVOKED';
+
+export interface AccessHistoryEntry {
+  id: string;
+  action: string;
+  timestamp: Date;
+  actor?: string;
+}
+
+export interface PortalAccess {
+  status: AccessStatus;
+  invitationSentAt: Date | null;
+  activatedAt: Date | null;
+  lastLoginAt: Date | null;
+  revokedAt: Date | null;
+  history: AccessHistoryEntry[];
+}
 
 export interface PlacedStudent {
   studentId: string;
@@ -17,7 +33,7 @@ export interface PlacedStudent {
   placedCompany: string;
   rolePlaced: string;
   packageLpa: number;
-  accessStatus: AccessStatus;
+  access: PortalAccess;
 }
 
 export interface AccessOperationResult {

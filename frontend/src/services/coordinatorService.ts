@@ -1,135 +1,127 @@
 import type { PlacedStudent, AccessOperationResult } from '../types';
 import { mockPlacedStudents } from '../data/mockPlacedStudents';
 
-/**
- * Coordinator Service - Access Management
- *
- * This service provides an abstraction layer for coordinator access management operations.
- *
- * CURRENT IMPLEMENTATION: Mock/in-memory operations
- * FUTURE IMPLEMENTATION: Replace with actual API calls to backend
- *
- * Backend Integration Points (to be implemented):
- * - GET /api/coordinator/{coordinatorId}/placed-students
- * - POST /api/coordinator/{coordinatorId}/access/{studentId}
- * - DELETE /api/coordinator/{coordinatorId}/access/{studentId}
- */
+let studentsState: PlacedStudent[] = JSON.parse(JSON.stringify(mockPlacedStudents));
 
-// In-memory state for mock implementation
-let studentsState: PlacedStudent[] = [...mockPlacedStudents];
-
-// Simulated network delay for realistic UX
 const simulateNetworkDelay = (ms: number = 500) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Fetch all placed students with their current access status
- *
- * FUTURE: Replace with actual API call
- * @param coordinatorId - The coordinator requesting the data
- * @returns Promise<PlacedStudent[]>
- */
-export const getPlacedStudents = async (
-  _coordinatorId?: string
-): Promise<PlacedStudent[]> => {
+export const getPlacedStudents = async (_coordinatorId?: string): Promise<PlacedStudent[]> => {
   await simulateNetworkDelay(300);
-
-  // Mock implementation: return in-memory state
-  // Future: return await fetch(`/api/coordinator/${_coordinatorId}/placed-students`)
-  return [...studentsState];
+  return JSON.parse(JSON.stringify(studentsState));
 };
 
-/**
- * Grant access to a placed student
- *
- * FUTURE: Replace with actual API call
- * @param coordinatorId - The coordinator granting access
- * @param studentId - The student to grant access to
- * @returns Promise<AccessOperationResult>
- */
-export const giveAccess = async (
-  _coordinatorId: string,
-  studentId: string
-): Promise<AccessOperationResult> => {
-  await simulateNetworkDelay(600);
-
-  const student = studentsState.find((s) => s.studentId === studentId);
-
-  if (!student) {
-    return {
-      success: false,
-      message: 'Student not found',
-    };
-  }
-
-  if (student.accessStatus === 'ACTIVE') {
-    return {
-      success: false,
-      message: 'Student already has access',
-    };
-  }
-
-  // Mock implementation: update in-memory state
-  studentsState = studentsState.map((s) =>
-    s.studentId === studentId ? { ...s, accessStatus: 'ACTIVE' } : s
-  );
-
-  // Future: await fetch(`/api/coordinator/${_coordinatorId}/access/${studentId}`, { method: 'POST' })
-
-  return {
-    success: true,
-    message: `Access granted successfully to ${student.name}`,
-    studentId,
-  };
+export const getStudentById = async (studentId: string): Promise<PlacedStudent | null> => {
+  await simulateNetworkDelay(200);
+  const student = studentsState.find(s => s.studentId === studentId);
+  return student ? JSON.parse(JSON.stringify(student)) : null;
 };
 
-/**
- * Revoke access from a placed student
- *
- * FUTURE: Replace with actual API call
- * @param coordinatorId - The coordinator revoking access
- * @param studentId - The student to revoke access from
- * @returns Promise<AccessOperationResult>
- */
-export const removeAccess = async (
-  _coordinatorId: string,
-  studentId: string
-): Promise<AccessOperationResult> => {
-  await simulateNetworkDelay(600);
-
-  const student = studentsState.find((s) => s.studentId === studentId);
-
-  if (!student) {
-    return {
-      success: false,
-      message: 'Student not found',
-    };
+export const giveAccess = async (_coordinatorId: string, studentId: string): Promise<AccessOperationResult> => {
+  await simulateNetworkDelay(500);
+  const student = studentsState.find(s => s.studentId === studentId);
+  if (!student) return { success: false, message: 'Student not found' };
+  
+  if (student.access.status !== 'NO_ACCESS' && student.access.status !== 'REVOKED') {
+    return { success: false, message: 'Cannot give access to student with current status' };
   }
 
-  if (student.accessStatus === 'NO_ACCESS') {
-    return {
-      success: false,
-      message: 'Student does not have access',
-    };
-  }
+  const now = new Date();
+  student.access.status = 'INVITED';
+  student.access.invitationSentAt = now;
+  student.access.history.push({
+    id: Date.now().toString(),
+    action: student.access.revokedAt ? 'New invitation sent' : 'Invitation sent',
+    timestamp: now,
+    actor: 'Coordinator'
+  });
 
-  // Mock implementation: update in-memory state
-  studentsState = studentsState.map((s) =>
-    s.studentId === studentId ? { ...s, accessStatus: 'NO_ACCESS' } : s
-  );
-
-  // Future: await fetch(`/api/coordinator/${_coordinatorId}/access/${studentId}`, { method: 'DELETE' })
-
-  return {
-    success: true,
-    message: `Access removed successfully from ${student.name}`,
-    studentId,
-  };
+  return { success: true, message: 'Invitation sent successfully', studentId };
 };
 
-/**
- * Reset mock data to initial state (for testing purposes)
- */
+export const resendInvitation = async (studentId: string): Promise<AccessOperationResult> => {
+  await simulateNetworkDelay(500);
+  const student = studentsState.find(s => s.studentId === studentId);
+  if (!student) return { success: false, message: 'Student not found' };
+  if (student.access.status !== 'INVITED') {
+    return { success: false, message: 'Can only resend invitation to invited students' };
+  }
+
+  const now = new Date();
+  student.access.invitationSentAt = now;
+  student.access.history.push({
+    id: Date.now().toString(),
+    action: 'Invitation resent',
+    timestamp: now,
+    actor: 'Coordinator'
+  });
+
+  return { success: true, message: 'Invitation resent successfully', studentId };
+};
+
+export const revokeInvitation = async (studentId: string): Promise<AccessOperationResult> => {
+  await simulateNetworkDelay(500);
+  const student = studentsState.find(s => s.studentId === studentId);
+  if (!student) return { success: false, message: 'Student not found' };
+  if (student.access.status !== 'INVITED') {
+    return { success: false, message: 'Can only revoke invitation for invited students' };
+  }
+
+  const now = new Date();
+  student.access.status = 'REVOKED';
+  student.access.revokedAt = now;
+  student.access.history.push({
+    id: Date.now().toString(),
+    action: 'Invitation revoked',
+    timestamp: now,
+    actor: 'Coordinator'
+  });
+
+  return { success: true, message: 'Invitation revoked successfully', studentId };
+};
+
+export const removeAccess = async (_coordinatorId: string, studentId: string): Promise<AccessOperationResult> => {
+  await simulateNetworkDelay(500);
+  const student = studentsState.find(s => s.studentId === studentId);
+  if (!student) return { success: false, message: 'Student not found' };
+  if (student.access.status !== 'ACTIVE') {
+    return { success: false, message: 'Can only remove access from active students' };
+  }
+
+  const now = new Date();
+  student.access.status = 'REVOKED';
+  student.access.revokedAt = now;
+  student.access.history.push({
+    id: Date.now().toString(),
+    action: 'Access removed',
+    timestamp: now,
+    actor: 'Coordinator'
+  });
+
+  return { success: true, message: 'Access removed successfully', studentId };
+};
+
+export const simulateActivation = async (studentId: string): Promise<AccessOperationResult> => {
+  await simulateNetworkDelay(500);
+  const student = studentsState.find(s => s.studentId === studentId);
+  if (!student) return { success: false, message: 'Student not found' };
+  if (student.access.status !== 'INVITED') {
+    return { success: false, message: 'Can only activate invited students' };
+  }
+
+  const now = new Date();
+  student.access.status = 'ACTIVE';
+  student.access.activatedAt = now;
+  student.access.lastLoginAt = now;
+  student.access.history.push({
+    id: Date.now().toString(),
+    action: 'Account activated',
+    timestamp: now
+  });
+
+  return { success: true, message: 'Account activated (demo)', studentId };
+};
+
 export const resetMockData = () => {
-  studentsState = [...mockPlacedStudents];
+  studentsState = JSON.parse(JSON.stringify(mockPlacedStudents));
 };

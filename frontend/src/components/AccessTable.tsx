@@ -110,7 +110,7 @@ export const AccessTable = ({
                   {student.packageLpa.toFixed(1)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {student.accessStatus === 'ACTIVE' ? (
+                  {student.access.status === 'ACTIVE' ? (
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                       Active
                     </span>
@@ -121,7 +121,7 @@ export const AccessTable = ({
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {student.accessStatus === 'ACTIVE' ? (
+                  {student.access.status === 'ACTIVE' ? (
                     <button
                       onClick={() => onRemoveAccess(student.studentId)}
                       disabled={isLoading}

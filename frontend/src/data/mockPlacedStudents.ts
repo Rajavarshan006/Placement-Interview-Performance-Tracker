@@ -1,17 +1,5 @@
 import type { PlacedStudent } from '../types';
 
-/**
- * Mock data for placed students.
- *
- * ASSUMPTION: This represents students who have been placed (final_status === "SELECTED").
- * Based on backend seed.py, two students got selected: Sneha (Zoho) and Priya (Infosys).
- *
- * Access status is a mock frontend state for demonstration purposes only.
- * The actual access control logic will be implemented by the backend team.
- *
- * In a real implementation, this data would come from:
- * GET /api/coordinator/{coordinatorId}/placed-students
- */
 export const mockPlacedStudents: PlacedStudent[] = [
   {
     studentId: '1',
@@ -23,7 +11,14 @@ export const mockPlacedStudents: PlacedStudent[] = [
     placedCompany: 'Zoho',
     rolePlaced: 'Member Technical Staff',
     packageLpa: 8.0,
-    accessStatus: 'ACTIVE',
+    access: {
+      status: 'NO_ACCESS',
+      invitationSentAt: null,
+      activatedAt: null,
+      lastLoginAt: null,
+      revokedAt: null,
+      history: []
+    }
   },
   {
     studentId: '2',
@@ -35,42 +30,107 @@ export const mockPlacedStudents: PlacedStudent[] = [
     placedCompany: 'Infosys',
     rolePlaced: 'Systems Engineer',
     packageLpa: 5.0,
-    accessStatus: 'NO_ACCESS',
+    access: {
+      status: 'ACTIVE',
+      invitationSentAt: new Date('2026-09-10T10:00:00'),
+      activatedAt: new Date('2026-09-11T15:30:00'),
+      lastLoginAt: new Date('2026-09-19T09:15:00'),
+      revokedAt: null,
+      history: [
+        {
+          id: '1',
+          action: 'Invitation sent',
+          timestamp: new Date('2026-09-10T10:00:00'),
+          actor: 'Coordinator'
+        },
+        {
+          id: '2',
+          action: 'Account activated',
+          timestamp: new Date('2026-09-11T15:30:00')
+        }
+      ]
+    }
   },
   {
     studentId: '3',
-    name: 'Ananya Reddy',
-    registerNumber: '2021CS102',
-    department: 'CSE',
-    email: 'ananya@college.edu',
+    name: 'Rajesh Kumar',
+    registerNumber: '2021IT023',
+    department: 'IT',
+    email: 'rajesh@college.edu',
     cgpa: 8.5,
     placedCompany: 'TCS',
-    rolePlaced: 'Software Developer',
-    packageLpa: 7.5,
-    accessStatus: 'ACTIVE',
+    rolePlaced: 'Software Engineer',
+    packageLpa: 7.0,
+    access: {
+      status: 'INVITED',
+      invitationSentAt: new Date('2026-09-18T14:00:00'),
+      activatedAt: null,
+      lastLoginAt: null,
+      revokedAt: null,
+      history: [
+        {
+          id: '1',
+          action: 'Invitation sent',
+          timestamp: new Date('2026-09-18T14:00:00'),
+          actor: 'Coordinator'
+        }
+      ]
+    }
   },
   {
     studentId: '4',
-    name: 'Rahul Sharma',
-    registerNumber: '2021CS101',
-    department: 'CSE',
-    email: 'rahul@college.edu',
-    cgpa: 7.8,
+    name: 'Anitha Reddy',
+    registerNumber: '2021ECE015',
+    department: 'ECE',
+    email: 'anitha@college.edu',
+    cgpa: 7.9,
     placedCompany: 'Wipro',
     rolePlaced: 'Project Engineer',
-    packageLpa: 6.0,
-    accessStatus: 'NO_ACCESS',
+    packageLpa: 4.5,
+    access: {
+      status: 'REVOKED',
+      invitationSentAt: new Date('2026-08-15T09:00:00'),
+      activatedAt: new Date('2026-08-16T11:00:00'),
+      lastLoginAt: new Date('2026-09-05T16:00:00'),
+      revokedAt: new Date('2026-09-15T10:00:00'),
+      history: [
+        {
+          id: '1',
+          action: 'Invitation sent',
+          timestamp: new Date('2026-08-15T09:00:00'),
+          actor: 'Coordinator'
+        },
+        {
+          id: '2',
+          action: 'Account activated',
+          timestamp: new Date('2026-08-16T11:00:00')
+        },
+        {
+          id: '3',
+          action: 'Access removed',
+          timestamp: new Date('2026-09-15T10:00:00'),
+          actor: 'Coordinator'
+        }
+      ]
+    }
   },
   {
     studentId: '5',
-    name: 'Vikram Patel',
-    registerNumber: '2021IT103',
-    department: 'IT',
+    name: 'Vikram Singh',
+    registerNumber: '2021EEE042',
+    department: 'EEE',
     email: 'vikram@college.edu',
-    cgpa: 6.9,
-    placedCompany: 'Cognizant',
-    rolePlaced: 'Programmer Analyst',
-    packageLpa: 4.5,
-    accessStatus: 'NO_ACCESS',
-  },
+    cgpa: 8.3,
+    placedCompany: 'Accenture',
+    rolePlaced: 'Associate Software Engineer',
+    packageLpa: 6.5,
+    access: {
+      status: 'NO_ACCESS',
+      invitationSentAt: null,
+      activatedAt: null,
+      lastLoginAt: null,
+      revokedAt: null,
+      history: []
+    }
+  }
 ];
