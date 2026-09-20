@@ -1,7 +1,7 @@
 from datetime import date
 
 from app.enums import AccessStatus
-from app.models import Student, Coordinator, Drive, StudentDriveRegistration
+from app.models import Student, Coordinator, Drive, StudentDriveRegistration, Authenticate
 from app.models.student_access import StudentAccess
 
 
@@ -75,6 +75,13 @@ def test_give_access_success(client, db):
     assert access is not None
     assert access.status == AccessStatus.INVITED
 
+    auth = db.query(Authenticate).filter(Authenticate.gmail == "student@test.com").first()
+    assert auth is not None
+    assert auth.user_id == "stu-1"
+    assert auth.role == "STUDENT"
+    assert auth.is_active is True
+    assert auth.password != ""
+
 
 def test_give_access_already_invited(client, db):
     _seed_placed_student(db)
@@ -109,6 +116,10 @@ def test_remove_access_from_active(client, db):
 
     access = db.query(StudentAccess).filter(StudentAccess.student_id == "stu-1").first()
     assert access.status == AccessStatus.REVOKED
+
+    auth = db.query(Authenticate).filter(Authenticate.gmail == "student@test.com").first()
+    assert auth is not None
+    assert auth.is_active is False
 
 
 def test_remove_access_not_active(client, db):

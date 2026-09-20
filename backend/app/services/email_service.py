@@ -22,10 +22,11 @@ You have been granted access to the Placement Interview Performance Tracking Por
 
 Here are your login credentials:
 
-    Username: {username}
+    Gmail (Username): {username}
     Password: {password}
 
-Please login and change your password immediately after first login.
+Use your Gmail address as your username to login.
+Please change your password immediately after first login.
 
 Important: Do not share your credentials with anyone.
 

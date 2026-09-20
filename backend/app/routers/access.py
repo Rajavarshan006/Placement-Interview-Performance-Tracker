@@ -13,6 +13,7 @@ from app.models import (
 )
 from app.models.student_access import StudentAccess
 from app.models.access_history import AccessHistory
+from app.models.authenticate import Authenticate
 from app.schemas.access import (
     AccessHistoryOut,
     AccessOperationResult,
@@ -21,7 +22,7 @@ from app.schemas.access import (
     PlacedStudentOut,
     RemoveAccessRequest,
 )
-from app.services.credential_service import generate_username, generate_password, hash_password
+from app.services.credential_service import generate_password, hash_password
 from app.services.email_service import send_credentials_email, send_access_revoked_email
 
 router = APIRouter(prefix="/api/access", tags=["access"])
@@ -150,17 +151,29 @@ def give_access(body: GiveAccessRequest, db: Session = Depends(get_db)):
             success=False, message="Cannot give access to student with current status"
         )
 
-    username = generate_username()
     plain_password = generate_password()
     hashed = hash_password(plain_password)
+
+    existing_auth = (
+        db.query(Authenticate).filter(Authenticate.gmail == student.email).first()
+    )
+    if existing_auth:
+        existing_auth.password = hashed
+        existing_auth.is_active = True
+    else:
+        auth_record = Authenticate(
+            gmail=student.email,
+            password=hashed,
+            user_id=student.student_id,
+            role="STUDENT",
+        )
+        db.add(auth_record)
 
     if access is None:
         access = StudentAccess(
             student_id=body.student_id,
             coordinator_id=body.coordinator_id,
             status=AccessStatus.INVITED,
-            username=username,
-            password_hash=hashed,
             invitation_sent_at=now,
         )
         db.add(access)
@@ -175,8 +188,6 @@ def give_access(body: GiveAccessRequest, db: Session = Depends(get_db)):
         db.add(history)
     else:
         access.status = AccessStatus.INVITED
-        access.username = username
-        access.password_hash = hashed
         access.invitation_sent_at = now
         access.revoked_at = None
         access.updated_at = now
@@ -194,7 +205,7 @@ def give_access(body: GiveAccessRequest, db: Session = Depends(get_db)):
     send_credentials_email(
         to_email=student.email,
         student_name=student.name,
-        username=username,
+        username=student.email,
         password=plain_password,
     )
 
@@ -223,9 +234,14 @@ def remove_access(body: RemoveAccessRequest, db: Session = Depends(get_db)):
     now = datetime.utcnow()
     access.status = AccessStatus.REVOKED
     access.revoked_at = now
-    access.username = None
-    access.password_hash = None
     access.updated_at = now
+
+    if student:
+        auth_record = (
+            db.query(Authenticate).filter(Authenticate.gmail == student.email).first()
+        )
+        if auth_record:
+            auth_record.is_active = False
 
     history = AccessHistory(
         student_access_id=access.access_id,
