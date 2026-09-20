@@ -23,6 +23,8 @@ class StudentAccess(Base):
     status: Mapped[AccessStatus] = mapped_column(
         nullable=False, default=AccessStatus.NO_ACCESS
     )
+    username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(256), nullable=True)
     invitation_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

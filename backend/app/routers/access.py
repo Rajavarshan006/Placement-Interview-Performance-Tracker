@@ -21,6 +21,8 @@ from app.schemas.access import (
     PlacedStudentOut,
     RemoveAccessRequest,
 )
+from app.services.credential_service import generate_username, generate_password, hash_password
+from app.services.email_service import send_credentials_email, send_access_revoked_email
 
 router = APIRouter(prefix="/api/access", tags=["access"])
 
@@ -143,11 +145,22 @@ def give_access(body: GiveAccessRequest, db: Session = Depends(get_db)):
 
     now = datetime.utcnow()
 
+    if access is not None and access.status not in (AccessStatus.NO_ACCESS, AccessStatus.REVOKED):
+        return AccessOperationResult(
+            success=False, message="Cannot give access to student with current status"
+        )
+
+    username = generate_username()
+    plain_password = generate_password()
+    hashed = hash_password(plain_password)
+
     if access is None:
         access = StudentAccess(
             student_id=body.student_id,
             coordinator_id=body.coordinator_id,
             status=AccessStatus.INVITED,
+            username=username,
+            password_hash=hashed,
             invitation_sent_at=now,
         )
         db.add(access)
@@ -160,29 +173,31 @@ def give_access(body: GiveAccessRequest, db: Session = Depends(get_db)):
             timestamp=now,
         )
         db.add(history)
-        db.commit()
-        return AccessOperationResult(
-            success=True, message="Invitation sent successfully", student_id=body.student_id
+    else:
+        access.status = AccessStatus.INVITED
+        access.username = username
+        access.password_hash = hashed
+        access.invitation_sent_at = now
+        access.revoked_at = None
+        access.updated_at = now
+
+        history = AccessHistory(
+            student_access_id=access.access_id,
+            action="New invitation sent",
+            actor="Coordinator",
+            timestamp=now,
         )
+        db.add(history)
 
-    if access.status not in (AccessStatus.NO_ACCESS, AccessStatus.REVOKED):
-        return AccessOperationResult(
-            success=False, message="Cannot give access to student with current status"
-        )
-
-    access.status = AccessStatus.INVITED
-    access.invitation_sent_at = now
-    access.revoked_at = None
-    access.updated_at = now
-
-    history = AccessHistory(
-        student_access_id=access.access_id,
-        action="New invitation sent",
-        actor="Coordinator",
-        timestamp=now,
-    )
-    db.add(history)
     db.commit()
+
+    send_credentials_email(
+        to_email=student.email,
+        student_name=student.name,
+        username=username,
+        password=plain_password,
+    )
+
     return AccessOperationResult(
         success=True, message="Invitation sent successfully", student_id=body.student_id
     )
@@ -203,9 +218,13 @@ def remove_access(body: RemoveAccessRequest, db: Session = Depends(get_db)):
             success=False, message="Can only remove access from active students"
         )
 
+    student = db.query(Student).filter(Student.student_id == body.student_id).first()
+
     now = datetime.utcnow()
     access.status = AccessStatus.REVOKED
     access.revoked_at = now
+    access.username = None
+    access.password_hash = None
     access.updated_at = now
 
     history = AccessHistory(
@@ -216,6 +235,10 @@ def remove_access(body: RemoveAccessRequest, db: Session = Depends(get_db)):
     )
     db.add(history)
     db.commit()
+
+    if student:
+        send_access_revoked_email(to_email=student.email, student_name=student.name)
+
     return AccessOperationResult(
         success=True, message="Access removed successfully", student_id=body.student_id
     )

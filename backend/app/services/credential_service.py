@@ -1,0 +1,17 @@
+import hashlib
+import secrets
+import string
+
+
+def generate_username() -> str:
+    random_part = secrets.token_hex(4)
+    return f"STU-{random_part}"
+
+
+def generate_password(length: int = 10) -> str:
+    alphabet = string.ascii_letters + string.digits + "!@#$%"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
