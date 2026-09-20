@@ -43,3 +43,10 @@ class InterventionStatus(str, enum.Enum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     DISMISSED = "DISMISSED"
+
+
+class AccessStatus(str, enum.Enum):
+    NO_ACCESS = "NO_ACCESS"
+    INVITED = "INVITED"
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
