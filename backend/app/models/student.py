@@ -21,6 +21,7 @@ class Student(Base):
     twelfth_percentage: Mapped[float] = mapped_column(Float, nullable=False)
     placement_marks: Mapped[float | None] = mapped_column(Float, nullable=True)
     skills: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    resume_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     round_results: Mapped[list["RoundResult"]] = relationship(back_populates="student")
