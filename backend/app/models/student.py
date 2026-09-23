@@ -27,3 +27,4 @@ class Student(Base):
     round_results: Mapped[list["RoundResult"]] = relationship(back_populates="student")
     registrations: Mapped[list["StudentDriveRegistration"]] = relationship(back_populates="student")
     interventions: Mapped[list["Intervention"]] = relationship(back_populates="student")
+    mentor_assignments: Mapped[list["MentorStudent"]] = relationship(back_populates="student", cascade="all, delete-orphan")
