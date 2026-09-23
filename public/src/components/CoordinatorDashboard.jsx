@@ -1,4 +1,17 @@
 function CoordinatorDashboard({ user, onLogout }) {
+    // Strict Access Control Guard: Students cannot view Coordinator Workspace or User Access tools
+    if (user && user.role && user.role.toLowerCase() === 'student') {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f172a', color: '#f8fafc', padding: '24px' }}>
+                <h2 style={{ fontSize: '1.5rem', color: '#ef4444', marginBottom: '8px' }}>Access Restricted</h2>
+                <p style={{ color: '#94a3b8', marginBottom: '20px' }}>Student accounts are not authorized to access Coordinator management tools.</p>
+                <button type="button" onClick={onLogout} style={{ padding: '10px 20px', borderRadius: '8px', background: '#3b82f6', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '600' }}>
+                    Sign Out
+                </button>
+            </div>
+        );
+    }
+
     const [drives, setDrives] = React.useState([]);
     const [loadingDrives, setLoadingDrives] = React.useState(true);
     
@@ -6,6 +19,7 @@ function CoordinatorDashboard({ user, onLogout }) {
     const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
     const [isUploadModalOpen, setIsUploadModalOpen] = React.useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = React.useState(false);
+    const [isUserAccessModalOpen, setIsUserAccessModalOpen] = React.useState(false);
     const [selectedDriveForUpload, setSelectedDriveForUpload] = React.useState(null);
     const [selectedDriveForView, setSelectedDriveForView] = React.useState(null);
 
@@ -41,6 +55,11 @@ function CoordinatorDashboard({ user, onLogout }) {
     const handleResultsUploaded = (driveId) => {
         fetchDrives();
         setToastMessage(`Student results updated successfully.`);
+        setTimeout(() => setToastMessage(''), 3500);
+    };
+
+    const handleUserAccessGranted = (data) => {
+        setToastMessage(`Successfully granted access to ${data.total_processed} user account(s).`);
         setTimeout(() => setToastMessage(''), 3500);
     };
 
@@ -176,6 +195,21 @@ function CoordinatorDashboard({ user, onLogout }) {
                                 Cards
                             </button>
                         </div>
+
+                        <button
+                            type="button"
+                            className="btn-upload-access"
+                            onClick={() => setIsUserAccessModalOpen(true)}
+                            title="Upload Excel with Gmails to Grant User Access"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Grant User Access (Excel)
+                        </button>
 
                         <button
                             type="button"
@@ -366,6 +400,13 @@ function CoordinatorDashboard({ user, onLogout }) {
                 isOpen={isViewModalOpen}
                 onClose={() => setIsViewModalOpen(false)}
                 drive={selectedDriveForView}
+            />
+
+            {/* Upload User Access Modal */}
+            <UploadUserAccessModal
+                isOpen={isUserAccessModalOpen}
+                onClose={() => setIsUserAccessModalOpen(false)}
+                onAccessGranted={handleUserAccessGranted}
             />
         </div>
     );

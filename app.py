@@ -1,12 +1,16 @@
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 import os
 import uvicorn
+import io
+import csv
+import openpyxl
 
 import db
+
 
 # Initialize database on startup
 db.init_db()
@@ -233,7 +237,107 @@ async def upload_drive_results(drive_id: str, file: UploadFile = File(...)):
         }
     )
 
+@app.post("/api/users/upload-access")
+async def upload_user_access(
+    file: UploadFile = File(...),
+    default_role: str = Form("Student")
+):
+    """
+    Upload Excel (.xlsx) or CSV file containing user email addresses.
+    Grants access and creates/updates account roles in the database.
+    """
+    filename = file.filename.lower()
+    content = await file.read()
+    
+    rows = []
+    
+    if filename.endswith(".xlsx") or filename.endswith(".xls"):
+        try:
+            wb = openpyxl.load_workbook(filename=io.BytesIO(content), data_only=True)
+            sheet = wb.active
+            for row in sheet.iter_rows(values_only=True):
+                if any(cell is not None for cell in row):
+                    rows.append([str(cell) if cell is not None else "" for cell in row])
+        except Exception as e:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "message": f"Error parsing Excel file: {str(e)}"}
+            )
+    elif filename.endswith(".csv"):
+        try:
+            decoded = content.decode("utf-8", errors="ignore")
+            reader = csv.reader(io.StringIO(decoded))
+            for r in reader:
+                if any(c.strip() for c in r):
+                    rows.append(r)
+        except Exception as e:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "message": f"Error parsing CSV file: {str(e)}"}
+            )
+    else:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"success": False, "message": "Unsupported file format. Please upload an .xlsx or .csv file."}
+        )
+        
+    if not rows:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"success": False, "message": "Uploaded file is empty."}
+        )
 
+    header = [str(cell).strip().lower() for cell in rows[0]]
+    
+    gmail_idx = -1
+    role_idx = -1
+    
+    for idx, col in enumerate(header):
+        if col in ["gmail", "email", "student email", "user email", "mail", "gmail_id", "email_id", "student email id"]:
+            gmail_idx = idx
+        elif col in ["role", "user role", "access role", "account role", "type"]:
+            role_idx = idx
+
+    if gmail_idx == -1:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"success": False, "message": f"Could not find a 'gmail' or 'email' column header in the spreadsheet. Found columns: {', '.join(header)}"}
+        )
+
+    users_to_process = []
+    skipped_count = 0
+
+    for row in rows[1:]:
+        if len(row) <= gmail_idx:
+            skipped_count += 1
+            continue
+            
+        gmail_val = str(row[gmail_idx]).strip()
+        role_val = str(row[role_idx]).strip() if (role_idx != -1 and len(row) > role_idx and str(row[role_idx]).strip()) else default_role
+        
+        if "@" in gmail_val:
+            users_to_process.append({"gmail": gmail_val, "role": role_val})
+        else:
+            skipped_count += 1
+
+    if not users_to_process:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"success": False, "message": "No valid Gmail addresses found in the spreadsheet."}
+        )
+
+    summary = db.bulk_grant_user_access(users_to_process)
+    summary["skipped_count"] = skipped_count
+    summary["total_rows"] = len(rows) - 1
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "message": f"Successfully granted access to {summary['total_processed']} users ({summary['created_count']} created, {summary['updated_count']} updated).",
+            **summary
+        }
+    )
 
 # Serve static frontend files
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "public")

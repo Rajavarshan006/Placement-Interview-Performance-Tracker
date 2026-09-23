@@ -265,7 +265,81 @@ def get_drive_results_count(drive_id: str) -> int:
     conn.close()
     return row["count"] if row else 0
 
+def bulk_grant_user_access(users_list: list):
+    """
+    Bulk create or update user access in 'authenticate' table.
+    users_list is a list of dicts: [{"gmail": "...", "role": "..."}, ...]
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    created_count = 0
+    updated_count = 0
+    processed_users = []
+
+    for item in users_list:
+        gmail = item.get("gmail", "").strip().lower()
+        role = item.get("role", "Student").strip()
+
+        # Normalize role casing
+        if role.lower() == "student":
+            role = "Student"
+        elif role.lower() == "recruiter":
+            role = "Recruiter"
+        elif role.lower() in ["coordinator", "admin"]:
+            role = "Coordinator"
+
+        if not gmail or "@" not in gmail:
+            continue
+
+        # Check existing user
+        cursor.execute("SELECT uuid, role, password FROM authenticate WHERE LOWER(gmail) = ?", (gmail,))
+        existing = cursor.fetchone()
+
+        if existing:
+            cursor.execute("UPDATE authenticate SET role = ? WHERE LOWER(gmail) = ?", (role, gmail))
+            updated_count += 1
+            processed_users.append({
+                "uuid": existing["uuid"],
+                "gmail": gmail,
+                "role": role,
+                "action": "Updated Role"
+            })
+        else:
+            if role == "Student":
+                default_pwd = "student123"
+            elif role == "Recruiter":
+                default_pwd = "recruiter123"
+            elif role == "Coordinator":
+                default_pwd = "coord123"
+            else:
+                default_pwd = "user123"
+
+            new_uuid = str(uuid.uuid4())
+            cursor.execute("""
+                INSERT INTO authenticate (uuid, gmail, password, role)
+                VALUES (?, ?, ?, ?)
+            """, (new_uuid, gmail, default_pwd, role))
+            created_count += 1
+            processed_users.append({
+                "uuid": new_uuid,
+                "gmail": gmail,
+                "role": role,
+                "action": "Created Account"
+            })
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "created_count": created_count,
+        "updated_count": updated_count,
+        "total_processed": len(processed_users),
+        "processed_users": processed_users
+    }
+
 if __name__ == "__main__":
     init_db()
     print("Database initialized successfully.")
+
 
