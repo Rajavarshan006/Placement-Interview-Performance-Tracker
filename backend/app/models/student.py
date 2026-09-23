@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, String
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -22,9 +22,10 @@ class Student(Base):
     placement_marks: Mapped[float | None] = mapped_column(Float, nullable=True)
     skills: Mapped[list | None] = mapped_column(JSON, nullable=True)
     resume_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("status.status_id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     round_results: Mapped[list["RoundResult"]] = relationship(back_populates="student")
     registrations: Mapped[list["StudentDriveRegistration"]] = relationship(back_populates="student")
     interventions: Mapped[list["Intervention"]] = relationship(back_populates="student")
-    mentor_assignments: Mapped[list["MentorStudent"]] = relationship(back_populates="student", cascade="all, delete-orphan")
+    status: Mapped["Status"] = relationship()
