@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Placement Portal - React Auth</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+
+    <!-- React 18 & Babel Standalone for native React JSX -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- React Components -->
+    <script type="text/babel" src="/static/src/components/LoginForm.jsx"></script>
+    <script type="text/babel" src="/static/src/components/CreateDriveModal.jsx"></script>
+    <script type="text/babel" src="/static/src/components/UploadResultsModal.jsx"></script>
+    <script type="text/babel" src="/static/src/components/ViewResultsModal.jsx"></script>
+    <script type="text/babel" src="/static/src/components/CoordinatorDashboard.jsx"></script>
+    <script type="text/babel" src="/static/src/components/StudentDashboard.jsx"></script>
+    <script type="text/babel" src="/static/src/components/Dashboard.jsx"></script>
+    <script type="text/babel" src="/static/src/App.jsx"></script>
+    <script type="text/babel">
+        const rootElement = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+    </script>
+</body>
+</html>
