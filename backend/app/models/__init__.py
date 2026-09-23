@@ -10,6 +10,7 @@ from app.models.intervention_action import InterventionAction
 from app.models.student_access import StudentAccess
 from app.models.access_history import AccessHistory
 from app.models.authenticate import Authenticate
+from app.models.status import Status
 
 __all__ = [
     "Student",
@@ -24,4 +25,5 @@ __all__ = [
     "StudentAccess",
     "AccessHistory",
     "Authenticate",
+    "Status",
 ]

@@ -10,6 +10,7 @@ from app.models.round_result import RoundResult
 from app.models.student_drive_registration import StudentDriveRegistration
 from app.models.intervention import Intervention
 from app.models.intervention_action import InterventionAction
+from app.models.status import Status
 from app.enums import (
     CompanyType, DriveStatus, RoundType, Result, Priority, InterventionStatus,
 )
@@ -173,3 +174,107 @@ def test_create_intervention_with_actions(db):
     assert intv.priority == Priority.HIGH
     assert len(intv.actions) == 1
     assert intv.actions[0].title == "Complete 30 DP problems"
+
+
+def test_create_status_with_empty_lists(db):
+    """Test Status can be created with empty attempt lists."""
+    status = Status(
+        status_id=_id(),
+    )
+    db.add(status)
+    db.commit()
+
+    retrieved = db.query(Status).first()
+    assert retrieved is not None
+    assert retrieved.failed_attempts == []
+    assert retrieved.successful_attempts == []
+
+
+def test_status_with_failed_attempts(db):
+    """Test Status can store and retrieve structured failed attempts."""
+    status = Status(
+        status_id=_id(),
+        failed_attempts=[
+            {"round": 2, "description": "Failed coding round - DP problem"},
+            {"round": 3, "description": "Failed technical interview - system design"},
+        ],
+        successful_attempts=[],
+    )
+    db.add(status)
+    db.commit()
+
+    retrieved = db.query(Status).first()
+    assert len(retrieved.failed_attempts) == 2
+    assert retrieved.failed_attempts[0]["round"] == 2
+    assert "DP problem" in retrieved.failed_attempts[0]["description"]
+    assert retrieved.failed_attempts[1]["round"] == 3
+
+
+def test_status_with_successful_attempts(db):
+    """Test Status can store and retrieve structured successful attempts."""
+    status = Status(
+        status_id=_id(),
+        failed_attempts=[],
+        successful_attempts=[
+            {"round": 1, "description": "Passed aptitude - 85/100"},
+            {"round": 2, "description": "Passed coding - solved 2/2 problems"},
+        ],
+    )
+    db.add(status)
+    db.commit()
+
+    retrieved = db.query(Status).first()
+    assert len(retrieved.successful_attempts) == 2
+    assert retrieved.successful_attempts[0]["round"] == 1
+    assert "85/100" in retrieved.successful_attempts[0]["description"]
+
+
+def test_student_with_status_relationship(db):
+    """Test Student can reference Status through status_id and relationship."""
+    status = Status(
+        status_id=_id(),
+        failed_attempts=[{"round": 2, "description": "Failed coding"}],
+        successful_attempts=[{"round": 1, "description": "Passed aptitude"}],
+    )
+    db.add(status)
+    db.commit()
+
+    student = Student(
+        student_id=_id(),
+        name="Test Student",
+        register_number="2021CS999",
+        email="test999@college.edu",
+        department="CSE",
+        cgpa=8.0,
+        tenth_percentage=90.0,
+        twelfth_percentage=85.0,
+        status_id=status.status_id,
+    )
+    db.add(student)
+    db.commit()
+
+    retrieved_student = db.query(Student).first()
+    assert retrieved_student.status_id == status.status_id
+    assert retrieved_student.status is not None
+    assert len(retrieved_student.status.failed_attempts) == 1
+    assert len(retrieved_student.status.successful_attempts) == 1
+
+
+def test_student_without_status_still_works(db):
+    """Test existing Student creation without Status continues to work (nullable status_id)."""
+    student = Student(
+        student_id=_id(),
+        name="Student Without Status",
+        register_number="2021CS998",
+        email="test998@college.edu",
+        department="IT",
+        cgpa=7.5,
+        tenth_percentage=88.0,
+        twelfth_percentage=82.0,
+    )
+    db.add(student)
+    db.commit()
+
+    retrieved = db.query(Student).first()
+    assert retrieved.status_id is None
+    assert retrieved.name == "Student Without Status"
