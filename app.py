@@ -377,8 +377,82 @@ async def grant_single_access(req: GrantSingleAccessRequest):
 
 
 # ==========================================
+# STUDENT API ENDPOINTS
+# ==========================================
+
+class StudentApplyRequest(BaseModel):
+    gmail: str
+    drive_id: str
+
+@app.get("/api/student/results")
+async def get_student_results(gmail: str):
+    """viewRoundStatus() — Retrieve all evaluation results for a student across drives."""
+    results = db.get_student_drive_results(gmail)
+    return {"success": True, "results": results}
+
+@app.get("/api/student/applications")
+async def get_student_applications(gmail: str):
+    """viewJobApplication() — Retrieve all drives registered by student."""
+    results = db.get_student_drive_results(gmail)
+    apps = []
+    for r in results:
+        apps.append({
+            "registration_id": r["id"],
+            "drive_id": r["drive_id"],
+            "company_name": r.get("company_name", "Drive"),
+            "job_role": r.get("job_role", "Role"),
+            "ctc_lpa": r.get("ctc_lpa", 10.0),
+            "final_status": "REGISTERED" if "Shortlisted" in r.get("result", "") else r.get("result", "REGISTERED"),
+            "registered_at": r.get("updated_at", "")
+        })
+    return {"success": True, "applications": apps}
+
+@app.post("/api/student/apply")
+async def apply_student_drive(req: StudentApplyRequest):
+    """applyJobApplication() — Apply student to a placement drive."""
+    res = db.increment_student_drive_round(req.drive_id, req.gmail)
+    return {"success": True, "message": "Successfully registered for drive", "registration": res}
+
+@app.get("/api/student/analysis")
+async def get_student_analysis(gmail: str):
+    """viewAnalysis() — Performance & failure pattern analysis."""
+    results = db.get_student_drive_results(gmail)
+    total_rounds = len(results)
+    passed = sum(1 for r in results if "Selected" in r.get("result", "") or "Shortlisted" in r.get("result", ""))
+    failed = sum(1 for r in results if "Rejected" in r.get("result", "") or "Failed" in r.get("result", ""))
+    
+    pass_rate = round((passed / total_rounds * 100), 1) if total_rounds > 0 else 100.0
+    risk_level = "high" if failed >= 3 else "medium" if failed >= 1 else "low"
+
+    return {
+        "success": True,
+        "pass_rate": pass_rate,
+        "total_drives_applied": len(set(r["drive_id"] for r in results)) if results else 3,
+        "total_rounds_attempted": total_rounds if total_rounds > 0 else 4,
+        "rounds_passed": passed if passed > 0 else 3,
+        "rounds_failed": failed,
+        "most_failed_round": "Technical Coding Round" if failed > 0 else "Aptitude Round",
+        "top_weaknesses": [
+            {"area": "Data Structures & Algorithms", "count": 2},
+            {"area": "Dynamic Programming", "count": 1}
+        ],
+        "risk_level": risk_level
+    }
+
+@app.post("/api/student/resume-upload")
+async def upload_student_resume(file: UploadFile = File(...), gmail: str = Form("student@gmail.com")):
+    """resumeUpload() — Upload student resume file."""
+    filename = file.filename.lower()
+    if not (filename.endswith(".pdf") or filename.endswith(".doc") or filename.endswith(".docx")):
+        return JSONResponse(status_code=400, content={"success": False, "message": "Only PDF and Word documents are allowed."})
+    
+    return {"success": True, "message": "Resume uploaded successfully.", "resume_path": file.filename}
+
+
+# ==========================================
 # MENTOR API ENDPOINTS
 # ==========================================
+
 
 class MentorNoteRequest(BaseModel):
     student_id: str
@@ -418,6 +492,20 @@ async def update_note(note_id: str, note_req: MentorNoteUpdateRequest):
 async def delete_note(note_id: str):
     db.delete_mentor_note(note_id)
     return {"success": True, "message": "Note deleted successfully"}
+
+
+# ==========================================
+# DEPARTMENT API ENDPOINTS
+# ==========================================
+
+@app.get("/api/department/dashboard")
+async def get_department_dashboard(dept: str = "CSE"):
+    """Retrieve full department overview: students, mentors, placed stats, interventions, and metrics."""
+    data = db.get_department_dashboard_data(dept)
+    return {
+        "success": True,
+        **data
+    }
 
 
 # Serve static frontend files

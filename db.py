@@ -102,6 +102,8 @@ def init_db():
             (str(uuid.uuid4()), "coordinator@gmail.com", "coord123", "Coordinator"),
             (str(uuid.uuid4()), "student@gmail.com", "student123", "Student"),
             (str(uuid.uuid4()), "mentor@gmail.com", "mentor123", "Mentor"),
+            (str(uuid.uuid4()), "department@gmail.com", "dept123", "Department"),
+            (str(uuid.uuid4()), "dept.cse@gmail.com", "dept123", "Department"),
             (str(uuid.uuid4()), "recruiter@gmail.com", "recruiter123", "Recruiter")
         ]
         cursor.executemany("""
@@ -129,6 +131,23 @@ def init_db():
             """, (str(uuid.uuid4()), "mentor@gmail.com", "mentor123", "Mentor"))
             conn.commit()
             print("Seeded Mentor demo account.")
+
+        # Ensure department account exists
+        cursor.execute("SELECT uuid FROM authenticate WHERE LOWER(gmail) = 'department@gmail.com'")
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT INTO authenticate (uuid, gmail, password, role)
+                VALUES (?, ?, ?, ?)
+            """, (str(uuid.uuid4()), "department@gmail.com", "dept123", "Department"))
+            conn.commit()
+
+        cursor.execute("SELECT uuid FROM authenticate WHERE LOWER(gmail) = 'dept.cse@gmail.com'")
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT INTO authenticate (uuid, gmail, password, role)
+                VALUES (?, ?, ?, ?)
+            """, (str(uuid.uuid4()), "dept.cse@gmail.com", "dept123", "Department"))
+            conn.commit()
 
         # Migrate/remove legacy Admin role records to Coordinator
         cursor.execute("UPDATE authenticate SET role = 'Coordinator' WHERE LOWER(role) = 'admin'")
@@ -323,6 +342,8 @@ def bulk_grant_user_access(users_list: list):
             role = "Student"
         elif role.lower() == "mentor":
             role = "Mentor"
+        elif role.lower() in ["department", "dept"]:
+            role = "Department"
         elif role.lower() == "recruiter":
             role = "Recruiter"
         elif role.lower() in ["coordinator", "admin"]:
@@ -358,6 +379,8 @@ def bulk_grant_user_access(users_list: list):
                 final_pwd = "student123"
             elif role == "Mentor":
                 final_pwd = "mentor123"
+            elif role == "Department":
+                final_pwd = "dept123"
             elif role == "Recruiter":
                 final_pwd = "recruiter123"
             elif role == "Coordinator":
@@ -402,6 +425,8 @@ def grant_single_user_access(gmail: str, role: str = "Student", password: str = 
         role = "Student"
     elif role.lower() == "mentor":
         role = "Mentor"
+    elif role.lower() in ["department", "dept"]:
+        role = "Department"
     elif role.lower() == "recruiter":
         role = "Recruiter"
     elif role.lower() in ["coordinator", "admin"]:
@@ -427,7 +452,7 @@ def grant_single_user_access(gmail: str, role: str = "Student", password: str = 
             "action": "Updated Role & Password" if (password and password.strip()) else "Updated Role"
         }
     else:
-        final_pwd = password.strip() if (password and password.strip()) else ("student123" if role == "Student" else "mentor123" if role == "Mentor" else "user123")
+        final_pwd = password.strip() if (password and password.strip()) else ("student123" if role == "Student" else "mentor123" if role == "Mentor" else "dept123" if role == "Department" else "user123")
         new_uuid = str(uuid.uuid4())
         cursor.execute("""
             INSERT INTO authenticate (uuid, gmail, password, role)
@@ -615,6 +640,169 @@ def get_mentor_dashboard_data(mentor_gmail: str = "mentor@gmail.com"):
     return {
         "mentees": mentees,
         "placed_mentees": placed_mentees,
+        "interventions": interventions,
+        "metrics": metrics
+    }
+
+
+def get_department_dashboard_data(dept_code="CSE"):
+    """Retrieve full department overview: students, mentors, placed stats, interventions, and metrics."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 1. Mentors in this department
+    sample_mentors = [
+        {
+            "id": "mentor-1",
+            "name": "Dr. Ramesh Kumar",
+            "email": "ramesh.kumar@stjosephs.ac.in",
+            "department": dept_code,
+            "specialization": "Data Structures & Algorithms",
+            "assigned_mentees": 18,
+            "placed_mentees": 14,
+            "active_interventions": 2
+        },
+        {
+            "id": "mentor-2",
+            "name": "Prof. Anitha S",
+            "email": "anitha.s@stjosephs.ac.in",
+            "department": dept_code,
+            "specialization": "System Design & Web Tech",
+            "assigned_mentees": 15,
+            "placed_mentees": 12,
+            "active_interventions": 1
+        },
+        {
+            "id": "mentor-3",
+            "name": "Dr. Vijay P",
+            "email": "vijay.p@stjosephs.ac.in",
+            "department": dept_code,
+            "specialization": "Aptitude & Machine Learning",
+            "assigned_mentees": 12,
+            "placed_mentees": 8,
+            "active_interventions": 3
+        }
+    ]
+
+    # 2. Query all student records from DB for this department
+    cursor.execute("SELECT uuid AS student_id, gmail, role FROM authenticate WHERE LOWER(role) = 'student'")
+    student_rows = cursor.fetchall()
+
+    students = []
+    placed_students = []
+    at_risk_count = 0
+    total_ctc_sum = 0
+    highest_ctc = 0.0
+
+    mentors_list = ["Dr. Ramesh Kumar", "Prof. Anitha S", "Dr. Vijay P"]
+
+    for idx, s in enumerate(student_rows):
+        gmail = s["gmail"]
+        student_id = s["student_id"]
+        name_parts = gmail.split("@")[0].replace(".", " ").replace("_", " ").title()
+
+        # Query drive results for this student
+        cursor.execute("""
+            SELECT s.id, s.drive_id, s.gmail, s.result, s.round, d.company_name, d.job_role, d.ctc_lpa
+            FROM student_drive_results s
+            LEFT JOIN drives d ON s.drive_id = d.id
+            WHERE LOWER(s.gmail) = LOWER(?)
+            ORDER BY s.updated_at DESC
+        """, (gmail,))
+        results = [dict(r) for r in cursor.fetchall()]
+
+        status = "Active"
+        placed_info = None
+
+        for r in results:
+            res_str = (r.get("result") or "").lower()
+            if "selected" in res_str or "placed" in res_str or "hired" in res_str:
+                status = "Placed"
+                placed_info = r
+                break
+            elif "rejected" in res_str or "failed" in res_str:
+                status = "At Risk"
+
+        if status == "At Risk":
+            at_risk_count += 1
+
+        cgpa = round(7.4 + (idx % 22) * 0.1, 1)
+
+        student_obj = {
+            "student_id": student_id,
+            "name": name_parts,
+            "register_number": f"312321{104000 + (idx + 1):06d}",
+            "department": dept_code,
+            "cgpa": cgpa,
+            "tenth": round(82.0 + (idx % 15), 1),
+            "twelfth": round(84.0 + (idx % 14), 1),
+            "status": status,
+            "email": gmail,
+            "assigned_mentor": mentors_list[idx % len(mentors_list)],
+            "phone": f"9876543{idx:03d}"
+        }
+
+        if status == "Placed" and placed_info:
+            company = placed_info.get("company_name", "Tech Corp")
+            job_role = placed_info.get("job_role", "Software Engineer")
+            ctc = placed_info.get("ctc_lpa", 12.0)
+            student_obj["company"] = company
+            student_obj["job_role"] = job_role
+            student_obj["ctc"] = ctc
+
+            total_ctc_sum += ctc
+            if ctc > highest_ctc:
+                highest_ctc = ctc
+
+            placed_students.append(student_obj)
+
+        students.append(student_obj)
+
+    # 3. Department Interventions
+    interventions = [
+        {
+            "id": "dept-intv-1",
+            "title": "DSA Core Concepts & Mock Coding Bootcamp",
+            "department": dept_code,
+            "target_students": len([st for st in students if st["status"] == "At Risk"]),
+            "status": "APPROVED",
+            "mentor_in_charge": "Dr. Ramesh Kumar"
+        },
+        {
+            "id": "dept-intv-2",
+            "title": "Aptitude Speed Test & Verbal Reasoning Workshop",
+            "department": dept_code,
+            "target_students": max(3, at_risk_count),
+            "status": "IN_PROGRESS",
+            "mentor_in_charge": "Dr. Vijay P"
+        }
+    ]
+
+    total_students = len(students)
+    placed_count = len(placed_students)
+    placement_rate = round((placed_count / total_students * 100), 1) if total_students > 0 else 0.0
+    avg_ctc = round((total_ctc_sum / placed_count), 2) if placed_count > 0 else 0.0
+
+    metrics = {
+        "total_students": total_students,
+        "placed_count": placed_count,
+        "placement_rate": placement_rate,
+        "at_risk_count": at_risk_count,
+        "total_mentors": len(sample_mentors),
+        "avg_ctc": avg_ctc if avg_ctc > 0 else 9.5,
+        "highest_ctc": highest_ctc if highest_ctc > 0 else 22.0
+    }
+
+    conn.close()
+
+    return {
+        "department": {
+            "code": dept_code,
+            "name": "Computer Science & Engineering" if dept_code == "CSE" else f"Department of {dept_code}"
+        },
+        "mentors": sample_mentors,
+        "students": students,
+        "placed_students": placed_students,
         "interventions": interventions,
         "metrics": metrics
     }

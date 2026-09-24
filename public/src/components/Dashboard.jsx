@@ -13,6 +13,11 @@ function Dashboard({ user, onLogout }) {
         return <MentorDashboard user={user} onLogout={onLogout} />;
     }
 
+    // Render Department portal for Department role
+    if (role === 'department' || role === 'dept') {
+        return <DepartmentDashboard user={user} onLogout={onLogout} />;
+    }
+
     // Default to Coordinator workspace for Coordinator and all management roles
     return <CoordinatorDashboard user={user} onLogout={onLogout} />;
 }

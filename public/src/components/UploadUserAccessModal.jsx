@@ -214,6 +214,7 @@ function UploadUserAccessModal({ isOpen, onClose, onAccessGranted }) {
                             >
                                 <option value="Student">Student</option>
                                 <option value="Mentor">Mentor</option>
+                                <option value="Department">Department</option>
                                 <option value="Recruiter">Recruiter</option>
                                 <option value="Coordinator">Coordinator</option>
                             </select>
@@ -308,6 +309,7 @@ function UploadUserAccessModal({ isOpen, onClose, onAccessGranted }) {
                                 >
                                     <option value="Student">Student</option>
                                     <option value="Mentor">Mentor</option>
+                                    <option value="Department">Department</option>
                                     <option value="Recruiter">Recruiter</option>
                                     <option value="Coordinator">Coordinator</option>
                                 </select>
