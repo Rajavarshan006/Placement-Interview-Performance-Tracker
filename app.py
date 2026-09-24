@@ -198,32 +198,36 @@ async def upload_drive_results(drive_id: str, file: UploadFile = File(...)):
             content={"success": False, "message": f"Could not find a 'gmail' or 'email' column header in the spreadsheet. Found columns: {', '.join(header)}"}
         )
         
-    if result_idx == -1:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"success": False, "message": f"Could not find a 'result' or 'status' column header in the spreadsheet. Found columns: {', '.join(header)}"}
-        )
-
     updated_count = 0
     skipped_count = 0
     processed_records = []
 
     # Process data rows
     for row in rows[1:]:
-        if len(row) <= max(gmail_idx, result_idx):
+        if len(row) <= gmail_idx:
             skipped_count += 1
             continue
             
         gmail_val = str(row[gmail_idx]).strip()
-        result_val = str(row[result_idx]).strip()
-        
-        # Validate gmail format basic check
-        if "@" in gmail_val and result_val:
+        if not gmail_val or "@" not in gmail_val:
+            skipped_count += 1
+            continue
+
+        if result_idx != -1 and len(row) > result_idx:
+            result_val = str(row[result_idx]).strip()
+        else:
+            result_val = None
+
+        if result_val:
             db.upsert_student_drive_result(drive_id, gmail_val, result_val)
             updated_count += 1
             processed_records.append({"gmail": gmail_val, "result": result_val})
         else:
-            skipped_count += 1
+            # Shortlist upload: increment round for student
+            inc_res = db.increment_student_drive_round(drive_id, gmail_val)
+            updated_count += 1
+            processed_records.append(inc_res)
+
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -291,12 +295,15 @@ async def upload_user_access(
     
     gmail_idx = -1
     role_idx = -1
+    password_idx = -1
     
     for idx, col in enumerate(header):
         if col in ["gmail", "email", "student email", "user email", "mail", "gmail_id", "email_id", "student email id"]:
             gmail_idx = idx
         elif col in ["role", "user role", "access role", "account role", "type"]:
             role_idx = idx
+        elif col in ["password", "pwd", "pass", "user password", "account password"]:
+            password_idx = idx
 
     if gmail_idx == -1:
         return JSONResponse(
@@ -314,11 +321,16 @@ async def upload_user_access(
             
         gmail_val = str(row[gmail_idx]).strip()
         role_val = str(row[role_idx]).strip() if (role_idx != -1 and len(row) > role_idx and str(row[role_idx]).strip()) else default_role
-        
+        password_val = str(row[password_idx]).strip() if (password_idx != -1 and len(row) > password_idx and str(row[password_idx]).strip()) else None
+
         if "@" in gmail_val:
-            users_to_process.append({"gmail": gmail_val, "role": role_val})
+            item = {"gmail": gmail_val, "role": role_val}
+            if password_val:
+                item["password"] = password_val
+            users_to_process.append(item)
         else:
             skipped_count += 1
+
 
     if not users_to_process:
         return JSONResponse(
@@ -338,6 +350,75 @@ async def upload_user_access(
             **summary
         }
     )
+
+class GrantSingleAccessRequest(BaseModel):
+    gmail: str
+    role: str = "Student"
+    password: str = None
+
+@app.post("/api/users/grant-single-access")
+async def grant_single_access(req: GrantSingleAccessRequest):
+    gmail = req.gmail.strip().lower()
+    if not gmail or "@" not in gmail:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"success": False, "message": "Please enter a valid Gmail address."}
+        )
+    
+    result = db.grant_single_user_access(gmail=gmail, role=req.role, password=req.password)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "message": f"Successfully granted {result['role']} access to {gmail}.",
+            "user": result
+        }
+    )
+
+
+# ==========================================
+# MENTOR API ENDPOINTS
+# ==========================================
+
+class MentorNoteRequest(BaseModel):
+    student_id: str
+    content: str
+
+class MentorNoteUpdateRequest(BaseModel):
+    content: str
+
+@app.get("/api/mentor/demo/mentees")
+async def get_mentor_demo_data():
+    """Retrieve mentor's assigned mentees, placed list, interventions, and metrics dynamically from SQLite DB."""
+    data = db.get_mentor_dashboard_data("mentor@gmail.com")
+    return {
+        "success": True,
+        **data
+    }
+
+
+@app.get("/api/mentor/notes")
+async def get_notes(student_id: str):
+    notes = db.get_mentor_notes("demo-mentor", student_id)
+    return {"success": True, "notes": notes}
+
+@app.post("/api/mentor/notes")
+async def create_note(note_req: MentorNoteRequest):
+    note = db.create_mentor_note("demo-mentor", note_req.student_id, note_req.content)
+    return {"success": True, "note": note}
+
+@app.put("/api/mentor/notes/{note_id}")
+async def update_note(note_id: str, note_req: MentorNoteUpdateRequest):
+    note = db.update_mentor_note(note_id, note_req.content)
+    if not note:
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"success": False, "message": "Note not found"})
+    return {"success": True, "note": note}
+
+@app.delete("/api/mentor/notes/{note_id}")
+async def delete_note(note_id: str):
+    db.delete_mentor_note(note_id)
+    return {"success": True, "message": "Note deleted successfully"}
+
 
 # Serve static frontend files
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "public")

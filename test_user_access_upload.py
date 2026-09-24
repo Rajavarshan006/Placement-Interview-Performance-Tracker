@@ -79,5 +79,56 @@ def test_bulk_user_access_upload():
     assert updated_user["role"] == "Recruiter"
     print("All update tests passed successfully!")
 
+def test_single_user_access_grant():
+    # Grant single user access via endpoint
+    res = client.post(
+        "/api/users/grant-single-access",
+        json={"gmail": "single_student@gmail.com", "role": "Student", "password": "custompwd123"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["user"]["gmail"] == "single_student@gmail.com"
+    assert data["user"]["role"] == "Student"
+    assert data["user"]["password"] == "custompwd123"
+
+    user_in_db = db.get_user_by_gmail("single_student@gmail.com")
+    assert user_in_db is not None
+    assert user_in_db["password"] == "custompwd123"
+    print("Single user access test passed successfully!")
+
+def test_bulk_upload_with_passwords():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["gmail", "role", "password"])
+    ws.append(["pwd_student1@gmail.com", "Student", "MyPass123!"])
+    ws.append(["pwd_student2@gmail.com", "Student", "Secure456#"])
+
+    excel_file = io.BytesIO()
+    wb.save(excel_file)
+    excel_file.seek(0)
+
+    res = client.post(
+        "/api/users/upload-access",
+        data={"default_role": "Student"},
+        files={"file": ("users_with_pwd.xlsx", excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+
+    u1 = db.get_user_by_gmail("pwd_student1@gmail.com")
+    assert u1 is not None
+    assert u1["password"] == "MyPass123!"
+
+    u2 = db.get_user_by_gmail("pwd_student2@gmail.com")
+    assert u2 is not None
+    assert u2["password"] == "Secure456#"
+    print("Bulk upload with passwords test passed successfully!")
+
 if __name__ == "__main__":
     test_bulk_user_access_upload()
+    test_single_user_access_grant()
+    test_bulk_upload_with_passwords()
+
+

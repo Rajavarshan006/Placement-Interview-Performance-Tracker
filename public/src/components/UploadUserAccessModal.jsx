@@ -1,10 +1,22 @@
 function UploadUserAccessModal({ isOpen, onClose, onAccessGranted }) {
     if (!isOpen) return null;
 
+    // Active mode tab: 'single' or 'bulk'
+    const [grantMode, setGrantMode] = React.useState('single');
+
+    // Single Student Form State
+    const [singleGmail, setSingleGmail] = React.useState('');
+    const [singleRole, setSingleRole] = React.useState('Student');
+    const [singlePassword, setSinglePassword] = React.useState('');
+
+    // Bulk File Form State
     const [selectedRole, setSelectedRole] = React.useState('Student');
     const [file, setFile] = React.useState(null);
+
+    // Common State
     const [loading, setLoading] = React.useState(false);
     const [errorMsg, setErrorMsg] = React.useState('');
+    const [successMsg, setSuccessMsg] = React.useState('');
     const [summaryReport, setSummaryReport] = React.useState(null);
 
     const handleFileChange = (e) => {
@@ -15,7 +27,49 @@ function UploadUserAccessModal({ isOpen, onClose, onAccessGranted }) {
         }
     };
 
-    const handleSubmit = async (e) => {
+    // Single Student Access Submission
+    const handleSingleSubmit = async (e) => {
+        e.preventDefault();
+        setErrorMsg('');
+        setSuccessMsg('');
+        
+        if (!singleGmail || !singleGmail.includes('@')) {
+            setErrorMsg('Please enter a valid Gmail address.');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const res = await fetch('/api/users/grant-single-access', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gmail: singleGmail.trim(),
+                    role: singleRole,
+                    password: singlePassword.trim() || undefined
+                })
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                setSuccessMsg(`Access granted to ${singleGmail} (${singleRole} Role). Default Password: ${data.user.password}`);
+                setSingleGmail('');
+                setSinglePassword('');
+                if (onAccessGranted) onAccessGranted(data);
+            } else {
+                setErrorMsg(data.message || 'Failed to grant user access.');
+            }
+        } catch (err) {
+            setErrorMsg('Network error. Could not connect to backend server.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Bulk Spreadsheet Submission
+    const handleBulkSubmit = async (e) => {
         e.preventDefault();
         setErrorMsg('');
         setSummaryReport(null);
@@ -48,7 +102,6 @@ function UploadUserAccessModal({ isOpen, onClose, onAccessGranted }) {
                 setErrorMsg(data.message || 'Failed to process user access upload.');
             }
         } catch (err) {
-            console.error('Error uploading user access:', err);
             setErrorMsg('Network error. Could not connect to API server.');
         } finally {
             setLoading(false);
@@ -59,139 +112,246 @@ function UploadUserAccessModal({ isOpen, onClose, onAccessGranted }) {
         setFile(null);
         setSummaryReport(null);
         setErrorMsg('');
+        setSuccessMsg('');
     };
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px' }}>
                 <div className="modal-head">
                     <div>
-                        <h3>Bulk User Access Grant (Excel Upload)</h3>
-                        <p className="modal-sub">Upload an Excel/CSV file containing user Gmail addresses to grant platform access</p>
+                        <h3>User Access Management</h3>
+                        <p className="modal-sub">Grant platform credentials to single students or upload bulk spreadsheets</p>
                     </div>
                     <button type="button" className="modal-close" onClick={onClose}>&times;</button>
                 </div>
 
+                {/* Mode Selector Tabs */}
+                <div style={{ display: 'flex', borderBottom: '1px solid #334155', margin: '12px 0 20px 0' }}>
+                    <button
+                        type="button"
+                        onClick={() => { setGrantMode('single'); setErrorMsg(''); setSuccessMsg(''); }}
+                        style={{
+                            flex: 1,
+                            padding: '10px',
+                            background: grantMode === 'single' ? '#2563eb' : 'transparent',
+                            color: grantMode === 'single' ? '#ffffff' : '#94a3b8',
+                            border: 'none',
+                            fontWeight: '600',
+                            borderRadius: '6px 6px 0 0',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Single User Access
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { setGrantMode('bulk'); setErrorMsg(''); setSuccessMsg(''); }}
+                        style={{
+                            flex: 1,
+                            padding: '10px',
+                            background: grantMode === 'bulk' ? '#2563eb' : 'transparent',
+                            color: grantMode === 'bulk' ? '#ffffff' : '#94a3b8',
+                            border: 'none',
+                            fontWeight: '600',
+                            borderRadius: '6px 6px 0 0',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Bulk Excel Upload
+                    </button>
+                </div>
+
                 {errorMsg && (
-                    <div className="form-alert-error">
+                    <div className="form-alert-error" style={{ marginBottom: '16px' }}>
                         {errorMsg}
                     </div>
                 )}
 
-                {summaryReport ? (
-                    <div className="upload-summary-box">
-                        <div className="summary-badge-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                        </div>
-                        <h4>User Access Granted Successfully!</h4>
-                        <p className="summary-desc">{summaryReport.message}</p>
-
-                        <div className="summary-metrics">
-                            <div className="sum-stat">
-                                <span className="val">{summaryReport.created_count}</span>
-                                <span className="lbl">New Accounts Created</span>
-                            </div>
-                            <div className="sum-stat">
-                                <span className="val">{summaryReport.updated_count}</span>
-                                <span className="lbl">Roles Updated</span>
-                            </div>
-                            <div className="sum-stat">
-                                <span className="val">{summaryReport.skipped_count}</span>
-                                <span className="lbl">Skipped Rows</span>
-                            </div>
-                        </div>
-
-                        {summaryReport.processed_users && summaryReport.processed_users.length > 0 && (
-                            <div className="preview-list-container">
-                                <span className="preview-title">Granted Access Accounts Summary:</span>
-                                <div className="preview-list">
-                                    {summaryReport.processed_users.slice(0, 6).map((usr, i) => (
-                                        <div key={i} className="preview-item">
-                                            <span className="p-gmail">{usr.gmail}</span>
-                                            <span className="p-res">{usr.role} ({usr.action})</span>
-                                        </div>
-                                    ))}
-                                    {summaryReport.processed_users.length > 6 && (
-                                        <span className="more-count">+ {summaryReport.processed_users.length - 6} more user accounts processed</span>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="modal-foot">
-                            <button type="button" className="btn-cancel" onClick={handleReset}>
-                                Upload Another File
-                            </button>
-                            <button type="button" className="btn-submit" onClick={onClose}>
-                                Done
-                            </button>
-                        </div>
+                {successMsg && (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#34d399', padding: '12px 16px', borderRadius: '6px', marginBottom: '16px', fontSize: '0.9rem' }}>
+                        {successMsg}
                     </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className="modal-form">
-                        <div className="input-field">
-                            <label>Default Assignee Role *</label>
+                )}
+
+                {/* MODE 1: SINGLE USER ACCESS FORM */}
+                {grantMode === 'single' && (
+                    <form onSubmit={handleSingleSubmit} className="modal-form">
+                        <div className="input-field" style={{ marginBottom: '16px' }}>
+                            <label style={{ color: '#f8fafc', fontWeight: '500', marginBottom: '6px', display: 'block' }}>Student Gmail Address *</label>
+                            <input
+                                type="email"
+                                placeholder="student.name@gmail.com"
+                                value={singleGmail}
+                                onChange={(e) => setSingleGmail(e.target.value)}
+                                required
+                                style={{
+                                    width: '100%',
+                                    padding: '10px 14px',
+                                    borderRadius: '6px',
+                                    background: '#0f172a',
+                                    border: '1px solid #334155',
+                                    color: '#f8fafc'
+                                }}
+                            />
+                        </div>
+
+                        <div className="input-field" style={{ marginBottom: '16px' }}>
+                            <label style={{ color: '#f8fafc', fontWeight: '500', marginBottom: '6px', display: 'block' }}>Assignee Role *</label>
                             <select
                                 className="form-select"
-                                value={selectedRole}
-                                onChange={(e) => setSelectedRole(e.target.value)}
+                                value={singleRole}
+                                onChange={(e) => setSingleRole(e.target.value)}
                                 required
+                                style={{
+                                    width: '100%',
+                                    padding: '10px 14px',
+                                    borderRadius: '6px',
+                                    background: '#0f172a',
+                                    border: '1px solid #334155',
+                                    color: '#f8fafc'
+                                }}
                             >
                                 <option value="Student">Student</option>
+                                <option value="Mentor">Mentor</option>
                                 <option value="Recruiter">Recruiter</option>
                                 <option value="Coordinator">Coordinator</option>
                             </select>
-                            <span className="field-hint" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                                Role to assign if no specific 'role' column is defined in the spreadsheet.
+                        </div>
+
+                        <div className="input-field" style={{ marginBottom: '20px' }}>
+                            <label style={{ color: '#f8fafc', fontWeight: '500', marginBottom: '6px', display: 'block' }}>Set Account Password *</label>
+                            <input
+                                type="text"
+                                placeholder="Enter password (e.g. StudentPass123)"
+                                value={singlePassword}
+                                onChange={(e) => setSinglePassword(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px 14px',
+                                    borderRadius: '6px',
+                                    background: '#0f172a',
+                                    border: '1px solid #334155',
+                                    color: '#f8fafc'
+                                }}
+                            />
+                            <span style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                                Enter a password for this user, or leave blank to assign role default (<strong>{singleRole === 'Student' ? 'student123' : singleRole === 'Mentor' ? 'mentor123' : 'user123'}</strong>).
                             </span>
                         </div>
 
-                        <div className="file-dropzone">
-                            <input
-                                type="file"
-                                id="userAccessFileInput"
-                                accept=".xlsx, .xls, .csv"
-                                onChange={handleFileChange}
-                                style={{ display: 'none' }}
-                            />
-                            <label htmlFor="userAccessFileInput" className="dropzone-label">
-                                <div className="dropzone-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                        <circle cx="9" cy="7" r="4"></circle>
-                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                    </svg>
-                                </div>
-                                {file ? (
-                                    <div className="file-selected-info">
-                                        <span className="fname">{file.name}</span>
-                                        <span className="fsize">({(file.size / 1024).toFixed(1)} KB)</span>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <span className="drop-title">Click to upload user spreadsheet</span>
-                                        <span className="drop-sub">Supports .xlsx and .csv files</span>
-                                    </div>
-                                )}
-                            </label>
-                        </div>
-
-                        <div className="info-box-tip">
-                            <strong>File Format Requirements:</strong> Spreadsheet must contain a column header named <code>gmail</code> (or <code>email</code>). Optional column header: <code>role</code> (values: Student, Recruiter, Coordinator).
-                        </div>
 
                         <div className="modal-foot">
                             <button type="button" className="btn-cancel" onClick={onClose} disabled={loading}>
                                 Cancel
                             </button>
-                            <button type="submit" className="btn-submit" disabled={loading || !file}>
-                                {loading ? 'Granting Access...' : 'Upload & Grant User Access'}
+                            <button type="submit" className="btn-submit" disabled={loading || !singleGmail}>
+                                {loading ? 'Granting Access...' : 'Grant Single User Access'}
                             </button>
                         </div>
                     </form>
+                )}
+
+                {/* MODE 2: BULK EXCEL UPLOAD FORM */}
+                {grantMode === 'bulk' && (
+                    summaryReport ? (
+                        <div className="upload-summary-box">
+                            <div className="summary-badge-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </div>
+                            <h4>User Access Granted Successfully!</h4>
+                            <p className="summary-desc">{summaryReport.message}</p>
+
+                            <div className="summary-metrics">
+                                <div className="sum-stat">
+                                    <span className="val">{summaryReport.created_count}</span>
+                                    <span className="lbl">New Accounts Created</span>
+                                </div>
+                                <div className="sum-stat">
+                                    <span className="val">{summaryReport.updated_count}</span>
+                                    <span className="lbl">Roles Updated</span>
+                                </div>
+                                <div className="sum-stat">
+                                    <span className="val">{summaryReport.skipped_count}</span>
+                                    <span className="lbl">Skipped Rows</span>
+                                </div>
+                            </div>
+
+                            <div className="modal-foot">
+                                <button type="button" className="btn-cancel" onClick={handleReset}>
+                                    Upload Another File
+                                </button>
+                                <button type="button" className="btn-submit" onClick={onClose}>
+                                    Done
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleBulkSubmit} className="modal-form">
+                            <div className="input-field" style={{ marginBottom: '16px' }}>
+                                <label style={{ color: '#f8fafc', fontWeight: '500', marginBottom: '6px', display: 'block' }}>Default Assignee Role *</label>
+                                <select
+                                    className="form-select"
+                                    value={selectedRole}
+                                    onChange={(e) => setSelectedRole(e.target.value)}
+                                    required
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        borderRadius: '6px',
+                                        background: '#0f172a',
+                                        border: '1px solid #334155',
+                                        color: '#f8fafc'
+                                    }}
+                                >
+                                    <option value="Student">Student</option>
+                                    <option value="Mentor">Mentor</option>
+                                    <option value="Recruiter">Recruiter</option>
+                                    <option value="Coordinator">Coordinator</option>
+                                </select>
+                            </div>
+
+                            <div className="file-dropzone" style={{ marginBottom: '16px' }}>
+                                <input
+                                    type="file"
+                                    id="userAccessFileInput"
+                                    accept=".xlsx, .xls, .csv"
+                                    onChange={handleFileChange}
+                                    style={{ display: 'none' }}
+                                />
+                                <label htmlFor="userAccessFileInput" className="dropzone-label">
+                                    <div className="dropzone-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                            <circle cx="9" cy="7" r="4"></circle>
+                                        </svg>
+                                    </div>
+                                    {file ? (
+                                        <div className="file-selected-info">
+                                            <span className="fname">{file.name}</span>
+                                            <span className="fsize">({(file.size / 1024).toFixed(1)} KB)</span>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <span className="drop-title">Click to upload spreadsheet</span>
+                                            <span className="drop-sub">Supports .xlsx and .csv files</span>
+                                        </div>
+                                    )}
+                                </label>
+                            </div>
+
+                            <div className="modal-foot">
+                                <button type="button" className="btn-cancel" onClick={onClose} disabled={loading}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn-submit" disabled={loading || !file}>
+                                    {loading ? 'Granting Access...' : 'Upload & Grant User Access'}
+                                </button>
+                            </div>
+                        </form>
+                    )
                 )}
             </div>
         </div>

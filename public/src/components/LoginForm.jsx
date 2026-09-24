@@ -185,10 +185,18 @@ function LoginForm({ onLoginSuccess }) {
                     <button
                         type="button"
                         className="chip"
+                        onClick={() => handleQuickFill('mentor@gmail.com', 'mentor123')}
+                    >
+                        <span className="chip-badge mentor" style={{ background: 'rgba(59,130,246,0.2)', color: '#60a5fa' }}>Mentor</span> mentor@gmail.com
+                    </button>
+                    <button
+                        type="button"
+                        className="chip"
                         onClick={() => handleQuickFill('student@gmail.com', 'student123')}
                     >
                         <span className="chip-badge student">Student</span> student@gmail.com
                     </button>
+
                 </div>
             </div>
         </div>
